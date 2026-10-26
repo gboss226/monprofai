@@ -21,6 +21,34 @@ services:
     networks:
       - monprofai-network
 
+  backend:
+    build:
+      context: .
+      dockerfile: ./src/Backend/Dockerfile
+    container_name: monprofai-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:5000
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-monprofai}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${DB_NAME:-monprofai};Username=${DB_USER:-postgres};Password=${DB_PASSWORD:-postgres}
+      JwtSettings__Secret: ${JwtSettings__Secret:-your-super-secret-key-change-this-in-production-at-least-32-characters-long!}
+      JwtSettings__Issuer: ${JwtSettings__Issuer:-MonProfAI}
+      JwtSettings__Audience: ${JwtSettings__Audience:-MonProfAI}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./src/Backend:/app/src
+    networks:
+      - monprofai-network
+
 volumes:
   postgres_data:
     driver: local

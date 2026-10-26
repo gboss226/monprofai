@@ -1,4 +1,5 @@
 using System.Text;
+using dotenv.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,13 @@ using MonProfAI.Infrastructure.Data;
 using MonProfAI.Infrastructure.Repositories;
 using MonProfAI.Infrastructure.Services;
 
+// Load .env file
+DotEnv.Load();
+
 var builder = WebApplicationBuilder.CreateBuilder(args);
+
+// Add .env variables to configuration
+builder.Configuration.AddEnvironmentVariables();
 
 // Configuration
 var jwtSecret = builder.Configuration["JwtSettings:Secret"] ?? throw new InvalidOperationException("JwtSettings:Secret not configured");
