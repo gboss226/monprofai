@@ -36,22 +36,23 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore dependencies
-        run: dotnet restore src/Backend/MonProfAI.Api/MonProfAI.Api.csproj
+        run: dotnet restore monprofai.sln
 
       - name: Build Backend
-        run: dotnet build src/Backend/MonProfAI.Api/MonProfAI.Api.csproj -c Release --no-restore
+        run: dotnet build monprofai.sln -c Release --no-restore
 
       - name: Run Database Migrations
         env:
           ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=monprofai;Username=postgres;Password=postgres
         run: |
+          dotnet tool install --global dotnet-ef --version 8.*
           cd src/Backend/MonProfAI.Api
           dotnet ef database update -p ../MonProfAI.Infrastructure
 
       - name: Run Backend Tests
         env:
           ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=monprofai;Username=postgres;Password=postgres
-        run: dotnet test src/Backend/ -c Release --no-build --verbosity normal
+        run: dotnet test src/Backend/MonProfAI.Tests/MonProfAI.Tests.csproj -c Release --no-build --verbosity normal
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v3
