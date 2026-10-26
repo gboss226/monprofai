@@ -101,7 +101,7 @@ jobs:
 
       - name: Validate docker-compose
         run: |
-          docker-compose -f docker-compose.yml config > /dev/null
+          docker compose -f docker-compose.yml config > /dev/null
           echo "✅ docker-compose.yml is valid"
 
       - name: Check file formatting
