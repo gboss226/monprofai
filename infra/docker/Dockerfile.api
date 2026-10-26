@@ -1,0 +1,23 @@
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /app
+
+COPY ["src/Backend/MonProfAI.Api/MonProfAI.Api.csproj", "MonProfAI.Api/"]
+COPY ["src/Backend/MonProfAI.Application/MonProfAI.Application.csproj", "MonProfAI.Application/"]
+COPY ["src/Backend/MonProfAI.Infrastructure/MonProfAI.Infrastructure.csproj", "MonProfAI.Infrastructure/"]
+COPY ["src/Backend/MonProfAI.Domain/MonProfAI.Domain.csproj", "MonProfAI.Domain/"]
+
+RUN dotnet restore "MonProfAI.Api/MonProfAI.Api.csproj"
+
+COPY src/Backend/ .
+
+RUN dotnet build "MonProfAI.Api/MonProfAI.Api.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "MonProfAI.Api/MonProfAI.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
+WORKDIR /app
+COPY --from=publish /app/publish .
+
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "MonProfAI.Api.dll"]
