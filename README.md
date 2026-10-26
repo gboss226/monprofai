@@ -16,7 +16,7 @@ Une plateforme web moderne pour accompagner les étudiants dans leur apprentissa
 
 ### Prérequis
 
-- **.NET 9.0** - [Télécharger](https://dotnet.microsoft.com/en-us/download)
+- **.NET 8.0** - [Télécharger](https://dotnet.microsoft.com/en-us/download)
 - **Node.js 20+** - [Télécharger](https://nodejs.org/)
 - **Docker & Docker Compose** (optionnel) - [Télécharger](https://www.docker.com/)
 - **PostgreSQL 16** (si pas Docker)

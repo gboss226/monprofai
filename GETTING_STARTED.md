@@ -6,7 +6,7 @@ Bienvenue! Ce guide vous aidera à démarrer le développement sur MonProfAI.
 
 Avant de commencer, installez:
 
-1. **[.NET 9 SDK](https://dotnet.microsoft.com/download)**
+1. **[.NET 8 SDK](https://dotnet.microsoft.com/download)**
    - Vérification: `dotnet --version` (doit afficher 9.0.x)
 
 2. **[Node.js 20+](https://nodejs.org/)**

@@ -11,7 +11,7 @@
 ## Stack & Technologies
 
 ### Backend
-- Framework: ASP.NET Core 9
+- Framework: ASP.NET Core 8
 - Database: PostgreSQL 16 + EF Core 9
 - Patterns: Clean Architecture, CQRS (MediatR)
 - Authentication: JWT with BCrypt password hashing
