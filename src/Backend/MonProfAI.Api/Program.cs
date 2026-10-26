@@ -9,7 +9,7 @@ using MonProfAI.Infrastructure.Data;
 using MonProfAI.Infrastructure.Repositories;
 using MonProfAI.Infrastructure.Services;
 
-var builder = WebApplicationBuilder.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 // Load environment variables from .env file or system
 builder.Configuration.AddEnvironmentVariables();
