@@ -1,8 +1,11 @@
 using System.Text;
+using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MonProfAI.Application.Behaviors;
 using MonProfAI.Application.Interfaces;
 using MonProfAI.Application.UseCases.Auth;
 using MonProfAI.Infrastructure.Data;
@@ -29,8 +32,12 @@ builder.Services.AddScoped<IAuthService>(sp =>
     new AuthService(jwtSecret, jwtIssuer, jwtAudience));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
-// MediatR
+// MediatR with FluentValidation
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining(typeof(RegisterUserCommand)));
+builder.Services.AddValidatorsFromAssemblyContaining(typeof(RegisterUserCommandValidator));
+
+// MediatR Pipeline Validation
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
 
 // Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
