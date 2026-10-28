@@ -1,12 +1,18 @@
 import { useAuthStore } from '../store/authStore'
 import { useNavigate } from 'react-router-dom'
+import client from '../api/client'
 
 export function Dashboard() {
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const navigate = useNavigate()
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await client.post('/auth/logout')
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
     logout()
     navigate('/login')
   }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import client from '../api/client'
-import { RegisterRequest, RegisterResponse } from '../types/auth'
+import { RegisterRequest } from '../types/auth'
 
 export function Register() {
   const [formData, setFormData] = useState({
@@ -26,7 +26,7 @@ export function Register() {
     setLoading(true)
 
     try {
-      await client.post<RegisterResponse>('/auth/register', {
+      await client.post('/auth/register', {
         email: formData.email,
         fullName: formData.fullName,
         password: formData.password,
@@ -34,7 +34,7 @@ export function Register() {
 
       navigate('/login?registered=true')
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed')
+      setError(err.response?.data?.message || 'Inscription échouée')
     } finally {
       setLoading(false)
     }
@@ -94,7 +94,7 @@ export function Register() {
 
           <div className="mb-4">
             <label htmlFor="password" className="block text-gray-700 font-medium mb-2">
-              Mot de passe
+              Mot de passe (min. 8 caractères, 1 majuscule, 1 minuscule, 1 chiffre)
             </label>
             <input
               id="password"

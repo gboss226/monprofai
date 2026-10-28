@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import client from '../api/client'
 import { useAuthStore } from '../store/authStore'
-import { LoginRequest, LoginResponse } from '../types/auth'
+import { LoginRequest } from '../types/auth'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -18,16 +18,16 @@ export function Login() {
     setLoading(true)
 
     try {
-      const response = await client.post<LoginResponse>('/auth/login', {
+      const response = await client.post<{ user: any }>('/auth/login', {
         email,
         password,
       } as LoginRequest)
 
-      const { accessToken, refreshToken, user } = response.data
-      login(user, accessToken, refreshToken)
+      const { user } = response.data
+      login(user)
       navigate('/dashboard')
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed')
+      setError(err.response?.data?.message || 'Connexion échouée')
     } finally {
       setLoading(false)
     }

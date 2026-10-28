@@ -3,28 +3,23 @@ import { User } from '../types/auth'
 
 interface AuthStore {
   user: User | null
-  accessToken: string | null
   isAuthenticated: boolean
-  login: (user: User, accessToken: string, refreshToken: string) => void
+  login: (user: User) => void
   logout: () => void
   setUser: (user: User | null) => void
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
-  accessToken: localStorage.getItem('accessToken'),
-  isAuthenticated: !!localStorage.getItem('accessToken'),
+  isAuthenticated: false,
 
-  login: (user, accessToken, refreshToken) => {
-    localStorage.setItem('accessToken', accessToken)
-    localStorage.setItem('refreshToken', refreshToken)
-    set({ user, accessToken, isAuthenticated: true })
+  login: (user) => {
+    set({ user, isAuthenticated: true })
+    // Tokens are in httpOnly cookies, handled by browser automatically
   },
 
   logout: () => {
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    set({ user: null, accessToken: null, isAuthenticated: false })
+    set({ user: null, isAuthenticated: false })
   },
 
   setUser: (user) => set({ user }),
