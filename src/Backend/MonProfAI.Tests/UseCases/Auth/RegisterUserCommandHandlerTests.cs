@@ -13,6 +13,7 @@ public class RegisterUserCommandHandlerTests
     {
         // Arrange
         var mockUserRepo = new Mock<IUserRepository>();
+        var mockLearnerProfileRepo = new Mock<ILearnerProfileRepository>();
         var mockAuthService = new Mock<IAuthService>();
 
         mockAuthService.Setup(x => x.HashPassword(It.IsAny<string>()))
@@ -24,7 +25,7 @@ public class RegisterUserCommandHandlerTests
         mockUserRepo.Setup(x => x.CreateAsync(It.IsAny<User>()))
             .ReturnsAsync((User u) => { u.Id = Guid.NewGuid(); return u; });
 
-        var handler = new RegisterUserCommandHandler(mockUserRepo.Object, mockAuthService.Object);
+        var handler = new RegisterUserCommandHandler(mockUserRepo.Object, mockLearnerProfileRepo.Object, mockAuthService.Object);
         var command = new RegisterUserCommand
         {
             Email = "test@example.com",
@@ -39,6 +40,7 @@ public class RegisterUserCommandHandlerTests
         Assert.NotNull(result);
         Assert.Equal("test@example.com", result.Email);
         mockUserRepo.Verify(x => x.CreateAsync(It.IsAny<User>()), Times.Once);
+        mockLearnerProfileRepo.Verify(x => x.CreateAsync(It.IsAny<MonProfAI.Domain.Entities.LearnerProfile>()), Times.Once);
     }
 
     [Fact]
@@ -46,13 +48,14 @@ public class RegisterUserCommandHandlerTests
     {
         // Arrange
         var mockUserRepo = new Mock<IUserRepository>();
+        var mockLearnerProfileRepo = new Mock<ILearnerProfileRepository>();
         var mockAuthService = new Mock<IAuthService>();
 
         var existingUser = new User { Email = "test@example.com" };
         mockUserRepo.Setup(x => x.GetByEmailAsync("test@example.com"))
             .ReturnsAsync(existingUser);
 
-        var handler = new RegisterUserCommandHandler(mockUserRepo.Object, mockAuthService.Object);
+        var handler = new RegisterUserCommandHandler(mockUserRepo.Object, mockLearnerProfileRepo.Object, mockAuthService.Object);
         var command = new RegisterUserCommand
         {
             Email = "test@example.com",

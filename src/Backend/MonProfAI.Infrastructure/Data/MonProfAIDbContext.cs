@@ -13,6 +13,8 @@ public class MonProfAIDbContext : DbContext
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<Lesson> Lessons => Set<Lesson>();
     public DbSet<UserCourse> UserCourses => Set<UserCourse>();
+    public DbSet<LearnerProfile> LearnerProfiles => Set<LearnerProfile>();
+    public DbSet<NotionMastery> NotionMasteries => Set<NotionMastery>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,6 +67,33 @@ public class MonProfAIDbContext : DbContext
                 .WithMany(c => c.Enrollments)
                 .HasForeignKey(e => e.CourseId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // LearnerProfile configuration
+        modelBuilder.Entity<LearnerProfile>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.User)
+                .WithOne()
+                .HasForeignKey<LearnerProfile>(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.SchoolLevel).IsRequired();
+            entity.Property(e => e.LearningObjectives).HasMaxLength(1000);
+            entity.Property(e => e.ExplanationPreferences).HasMaxLength(1000);
+        });
+
+        // NotionMastery configuration
+        modelBuilder.Entity<NotionMastery>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.NotionKey).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.MasteryScore).IsRequired();
+            entity.Property(e => e.AttemptCount).IsRequired();
+            entity.HasIndex(e => new { e.UserId, e.NotionKey }).IsUnique();
         });
     }
 }
