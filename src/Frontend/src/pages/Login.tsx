@@ -25,15 +25,21 @@ export function Login() {
         password,
       } as LoginRequest)
 
-      const { user } = response.data
-      login(user)
-
-      const profile = await getMyProfile()
-      setProfile(profile)
-
-      navigate(profile.onboardingCompleted ? '/dashboard' : '/onboarding')
+      login(response.data.user)
     } catch (err: any) {
       setError(err.response?.data?.message || 'Connexion échouée')
+      setLoading(false)
+      return
+    }
+
+    // Login succeeded — fetching the profile only decides where to redirect,
+    // so a failure here must not be reported as a failed login.
+    try {
+      const profile = await getMyProfile()
+      setProfile(profile)
+      navigate(profile.onboardingCompleted ? '/dashboard' : '/onboarding')
+    } catch {
+      navigate('/dashboard')
     } finally {
       setLoading(false)
     }
