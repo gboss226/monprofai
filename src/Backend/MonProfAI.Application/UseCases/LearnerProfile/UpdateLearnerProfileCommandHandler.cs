@@ -19,8 +19,10 @@ public class UpdateLearnerProfileCommandHandler : IRequestHandler<UpdateLearnerP
             ?? throw new InvalidOperationException("Learner profile not found");
 
         profile.SchoolLevel = Enum.Parse<SchoolLevel>(request.SchoolLevel);
-        profile.LearningObjectives = request.LearningObjectives;
-        profile.ExplanationPreferences = request.ExplanationPreferences;
+        profile.StrugglingSubjects = request.StrugglingSubjects;
+        profile.Goal = Enum.Parse<LearningGoal>(request.Goal);
+        profile.PreferredLearningStyle = Enum.Parse<LearningStyle>(request.PreferredLearningStyle);
+        profile.OnboardingCompleted = true;
         profile.UpdatedAt = DateTime.UtcNow;
 
         await _learnerProfileRepository.UpdateAsync(profile);
@@ -29,8 +31,11 @@ public class UpdateLearnerProfileCommandHandler : IRequestHandler<UpdateLearnerP
             profile.Id,
             profile.UserId,
             profile.SchoolLevel.ToString(),
+            profile.StrugglingSubjects,
+            profile.Goal?.ToString(),
+            profile.PreferredLearningStyle?.ToString(),
             profile.LearningObjectives,
-            profile.ExplanationPreferences,
+            profile.OnboardingCompleted,
             profile.UpdatedAt
         );
     }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import client from '../api/client'
+import { getMyProfile } from '../api/learnerProfile'
 import { useAuthStore } from '../store/authStore'
 import { LoginRequest } from '../types/auth'
 
@@ -11,6 +12,7 @@ export function Login() {
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const login = useAuthStore((state) => state.login)
+  const setProfile = useAuthStore((state) => state.setProfile)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,7 +27,11 @@ export function Login() {
 
       const { user } = response.data
       login(user)
-      navigate('/dashboard')
+
+      const profile = await getMyProfile()
+      setProfile(profile)
+
+      navigate(profile.onboardingCompleted ? '/dashboard' : '/onboarding')
     } catch (err: any) {
       setError(err.response?.data?.message || 'Connexion échouée')
     } finally {

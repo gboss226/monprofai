@@ -21,8 +21,11 @@ public class GetLearnerProfileQueryHandler : IRequestHandler<GetLearnerProfileQu
             profile.Id,
             profile.UserId,
             profile.SchoolLevel.ToString(),
+            profile.StrugglingSubjects,
+            profile.Goal?.ToString(),
+            profile.PreferredLearningStyle?.ToString(),
             profile.LearningObjectives,
-            profile.ExplanationPreferences,
+            profile.OnboardingCompleted,
             profile.UpdatedAt
         );
     }
