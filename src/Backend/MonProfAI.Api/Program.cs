@@ -31,6 +31,7 @@ builder.Services.AddDbContext<MonProfAIDbContext>(options =>
 builder.Services.AddScoped<IAuthService>(sp =>
     new AuthService(jwtSecret, jwtIssuer, jwtAudience));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ILearnerProfileRepository, LearnerProfileRepository>();
 
 // MediatR with FluentValidation
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining(typeof(RegisterUserCommand)));
@@ -52,6 +53,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidAudience = jwtAudience,
             ValidateLifetime = true
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (context.Request.Cookies.TryGetValue("accessToken", out var token))
+                {
+                    context.Token = token;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 

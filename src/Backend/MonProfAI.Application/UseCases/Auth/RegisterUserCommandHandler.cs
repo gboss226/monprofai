@@ -7,11 +7,13 @@ namespace MonProfAI.Application.UseCases.Auth;
 public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, RegisterUserResponse>
 {
     private readonly IUserRepository _userRepository;
+    private readonly ILearnerProfileRepository _learnerProfileRepository;
     private readonly IAuthService _authService;
 
-    public RegisterUserCommandHandler(IUserRepository userRepository, IAuthService authService)
+    public RegisterUserCommandHandler(IUserRepository userRepository, ILearnerProfileRepository learnerProfileRepository, IAuthService authService)
     {
         _userRepository = userRepository;
+        _learnerProfileRepository = learnerProfileRepository;
         _authService = authService;
     }
 
@@ -31,6 +33,16 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, R
         };
 
         var createdUser = await _userRepository.CreateAsync(user);
+
+        var profile = new MonProfAI.Domain.Entities.LearnerProfile
+        {
+            UserId = createdUser.Id,
+            SchoolLevel = SchoolLevel.Sixieme,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _learnerProfileRepository.CreateAsync(profile);
 
         return new RegisterUserResponse
         {
