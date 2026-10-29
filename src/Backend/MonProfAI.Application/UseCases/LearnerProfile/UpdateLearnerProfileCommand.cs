@@ -5,6 +5,7 @@ namespace MonProfAI.Application.UseCases.LearnerProfile;
 public record UpdateLearnerProfileCommand(
     Guid UserId,
     string SchoolLevel,
-    string? LearningObjectives,
-    string? ExplanationPreferences
+    List<string> StrugglingSubjects,
+    string Goal,
+    string PreferredLearningStyle
 ) : IRequest<LearnerProfileDto>;

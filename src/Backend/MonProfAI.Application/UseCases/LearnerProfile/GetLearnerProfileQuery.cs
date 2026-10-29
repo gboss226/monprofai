@@ -8,7 +8,10 @@ public record LearnerProfileDto(
     Guid Id,
     Guid UserId,
     string SchoolLevel,
+    List<string> StrugglingSubjects,
+    string? Goal,
+    string? PreferredLearningStyle,
     string? LearningObjectives,
-    string? ExplanationPreferences,
+    bool OnboardingCompleted,
     DateTime UpdatedAt
 );

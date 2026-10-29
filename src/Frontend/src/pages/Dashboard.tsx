@@ -1,11 +1,25 @@
-import { useAuthStore } from '../store/authStore'
-import { useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import client from '../api/client'
+import { getMyProfile } from '../api/learnerProfile'
+import { useAuthStore } from '../store/authStore'
 
 export function Dashboard() {
   const user = useAuthStore((state) => state.user)
+  const profile = useAuthStore((state) => state.profile)
+  const setProfile = useAuthStore((state) => state.setProfile)
   const logout = useAuthStore((state) => state.logout)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!profile) {
+      getMyProfile()
+        .then(setProfile)
+        .catch(() => {
+          // profile fetch failure is non-blocking for the dashboard
+        })
+    }
+  }, [profile, setProfile])
 
   const handleLogout = async () => {
     try {
@@ -35,6 +49,18 @@ export function Dashboard() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
+        {profile && !profile.onboardingCompleted && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded mb-6 flex items-center justify-between">
+            <span>Complète ton profil pour une expérience personnalisée.</span>
+            <Link
+              to="/onboarding"
+              className="font-medium text-blue-700 hover:underline whitespace-nowrap ml-4"
+            >
+              Compléter mon profil
+            </Link>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Mes cours</h2>

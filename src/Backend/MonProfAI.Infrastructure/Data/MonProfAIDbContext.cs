@@ -78,8 +78,9 @@ public class MonProfAIDbContext : DbContext
                 .HasForeignKey<LearnerProfile>(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.Property(e => e.SchoolLevel).IsRequired();
+            entity.Property(e => e.StrugglingSubjects).IsRequired();
             entity.Property(e => e.LearningObjectives).HasMaxLength(1000);
-            entity.Property(e => e.ExplanationPreferences).HasMaxLength(1000);
+            entity.Property(e => e.OnboardingCompleted).IsRequired();
         });
 
         // NotionMastery configuration

@@ -36,9 +36,9 @@ public class LearnerProfileController : ControllerBase
         }
     }
 
-    [HttpPut("me")]
-    public async Task<ActionResult<LearnerProfileDto>> UpdateMyProfile(
-        [FromBody] UpdateLearnerProfileRequest request)
+    [HttpPost("onboarding")]
+    public async Task<ActionResult<LearnerProfileDto>> CompleteOnboarding(
+        [FromBody] CompleteOnboardingRequest request)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(userId, out var userGuid))
@@ -49,8 +49,9 @@ public class LearnerProfileController : ControllerBase
             var profile = await _mediator.Send(new UpdateLearnerProfileCommand(
                 userGuid,
                 request.SchoolLevel,
-                request.LearningObjectives,
-                request.ExplanationPreferences
+                request.StrugglingSubjects,
+                request.Goal,
+                request.PreferredLearningStyle
             ));
             return Ok(profile);
         }
@@ -61,8 +62,9 @@ public class LearnerProfileController : ControllerBase
     }
 }
 
-public record UpdateLearnerProfileRequest(
+public record CompleteOnboardingRequest(
     string SchoolLevel,
-    string? LearningObjectives,
-    string? ExplanationPreferences
+    List<string> StrugglingSubjects,
+    string Goal,
+    string PreferredLearningStyle
 );
