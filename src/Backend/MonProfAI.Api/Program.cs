@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MonProfAI.Api.Ai;
 using MonProfAI.Application.Behaviors;
 using MonProfAI.Application.Interfaces;
 using MonProfAI.Application.UseCases.Auth;
@@ -32,6 +33,7 @@ builder.Services.AddScoped<IAuthService>(sp =>
     new AuthService(jwtSecret, jwtIssuer, jwtAudience));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ILearnerProfileRepository, LearnerProfileRepository>();
+builder.Services.AddAiTutor(builder.Configuration, builder.Environment.ContentRootPath);
 
 // MediatR with FluentValidation
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining(typeof(RegisterUserCommand)));
@@ -96,6 +98,10 @@ app.UseHttpsRedirection();
 app.UseCors("AllowReact");
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 
 app.Run();
+
+// Lets integration tests start the API with WebApplicationFactory<Program>.
+public partial class Program;
