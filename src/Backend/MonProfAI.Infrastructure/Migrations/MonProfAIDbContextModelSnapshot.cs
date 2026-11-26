@@ -138,6 +138,41 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.ToTable("Courses");
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Exercise", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("NotionDetected")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("NotionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Statement")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotionId");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("Exercises");
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.LearnerProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -440,6 +475,25 @@ namespace MonProfAI.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Teacher");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Exercise", b =>
+                {
+                    b.HasOne("MonProfAI.Domain.Entities.Notion", "Notion")
+                        .WithMany()
+                        .HasForeignKey("NotionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MonProfAI.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Notion");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("MonProfAI.Domain.Entities.LearnerProfile", b =>

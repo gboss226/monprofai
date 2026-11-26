@@ -21,6 +21,7 @@ public class MonProfAIDbContext : DbContext
     public DbSet<NotionPrerequisite> NotionPrerequisites => Set<NotionPrerequisite>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ConversationMessage> Messages => Set<ConversationMessage>();
+    public DbSet<Exercise> Exercises => Set<Exercise>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -191,6 +192,23 @@ public class MonProfAIDbContext : DbContext
             entity.Property(e => e.Role).IsRequired();
             entity.Property(e => e.Content).IsRequired();
             entity.HasIndex(e => new { e.ConversationId, e.CreatedAt });
+        });
+
+        // Exercises entered by students. Same deletion rules as conversations.
+        modelBuilder.Entity<Exercise>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Notion)
+                .WithMany()
+                .HasForeignKey(e => e.NotionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(e => e.Statement).IsRequired().HasMaxLength(ExerciseLimits.MaxStatementLength);
+            entity.Property(e => e.Status).IsRequired();
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt });
         });
     }
 }
