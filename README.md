@@ -42,6 +42,8 @@ cd src/Backend/MonProfAI.Api
 dotnet run
 ```
 
+En local, `dotnet run` utilise l'environnement `Development` et se connecte à PostgreSQL sur `localhost:5432` (voir `appsettings.Development.json`).
+
 L'API sera disponible sur `http://localhost:5000`
 
 #### 2. Frontend
@@ -300,6 +302,36 @@ erDiagram
 `SchoolLevel` reprend l'énumération du profil apprenant : 0 = 6ème, 1 = 5ème, 2 = 4ème, 3 = 3ème, 4 = 2nde, 5 = 1ère, 6 = Terminale.
 
 > Les noms de tables suivent la convention EF Core du projet (PascalCase au pluriel) : `subjects` → `Subjects`, `notion_prerequisites` → `NotionPrerequisites`, etc.
+
+### Données de test (seed)
+
+Une commande remplit la base avec des données de test. Elle applique d'abord les migrations, donc elle marche aussi sur une base vide.
+
+```bash
+# PostgreSQL doit tourner (docker compose up -d postgres)
+dotnet run --project src/Backend/MonProfAI.Api -- seed
+```
+
+Si l'API tourne dans Docker (`docker compose up -d`), lance plutôt le seed dans le conteneur :
+
+```bash
+docker compose exec backend dotnet MonProfAI.Api.dll seed
+```
+
+Le seed contient :
+
+- la matière **Mathématiques** avec les chapitres et notions de **4ème** et **3ème** (programme du cycle 4, réparti selon les repères annuels de progression) et des prérequis entre notions, par exemple *Trigonométrie* → *Théorème de Pythagore* ;
+- trois élèves fictifs.
+
+| Email | Mot de passe | Profil |
+|-------|--------------|--------|
+| `ines.4e@monprofai.test` | `Eleve2026!` | 4ème, questionnaire rempli, en difficulté sur les fractions |
+| `hugo.3e@monprofai.test` | `Eleve2026!` | 3ème, prépare le brevet, à l'aise en 4ème et découvre la 3ème |
+| `sacha.nouveau@monprofai.test` | `Eleve2026!` | Nouveau compte, questionnaire d'accueil pas encore rempli |
+
+La commande peut être relancée autant de fois que voulu : elle ne crée pas de doublons. Chaque ligne est retrouvée par sa clé naturelle (code de matière, classe et position du chapitre, position de la notion, email…) et mise à jour. Les comptes de test reprennent donc leur état d'origine, et les autres données de la base ne sont pas modifiées.
+
+> Le seed refuse de tourner hors de l'environnement `Development`, car ces comptes ont un mot de passe public.
 
 ## 🚢 Déploiement
 

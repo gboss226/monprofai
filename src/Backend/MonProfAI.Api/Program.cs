@@ -11,9 +11,14 @@ using MonProfAI.Application.Interfaces;
 using MonProfAI.Application.UseCases.Auth;
 using MonProfAI.Infrastructure.Data;
 using MonProfAI.Infrastructure.Repositories;
+using MonProfAI.Infrastructure.Seeding;
 using MonProfAI.Infrastructure.Services;
 
-var builder = WebApplication.CreateBuilder(args);
+// `dotnet run -- seed` applies migrations, loads the test data and exits (see README).
+const string SeedCommand = "seed";
+var seedMode = args.Contains(SeedCommand);
+
+var builder = WebApplication.CreateBuilder(args.Where(a => a != SeedCommand).ToArray());
 
 // Load environment variables from .env file or system
 builder.Configuration.AddEnvironmentVariables();
@@ -33,6 +38,7 @@ builder.Services.AddScoped<IAuthService>(sp =>
     new AuthService(jwtSecret, jwtIssuer, jwtAudience));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ILearnerProfileRepository, LearnerProfileRepository>();
+builder.Services.AddScoped<DevDataSeeder>();
 builder.Services.AddAiTutor(builder.Configuration, builder.Environment.ContentRootPath);
 
 // MediatR with FluentValidation
@@ -87,6 +93,29 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+if (seedMode)
+{
+    // The seeded accounts share a password published in the README: never load them outside development.
+    if (!app.Environment.IsDevelopment())
+    {
+        Console.Error.WriteLine(
+            $"Seed refusé : environnement '{app.Environment.EnvironmentName}'. Le seed ne tourne qu'en Development.");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<MonProfAIDbContext>();
+    await db.Database.MigrateAsync();
+    var result = await scope.ServiceProvider.GetRequiredService<DevDataSeeder>().SeedAsync();
+    Console.WriteLine(
+        $"Seed terminé : {result.Total} ligne(s) créée(s) — matières {result.SubjectsCreated}, " +
+        $"chapitres {result.ChaptersCreated}, notions {result.NotionsCreated}, " +
+        $"prérequis {result.PrerequisitesCreated}, élèves {result.UsersCreated}, " +
+        $"profils {result.ProfilesCreated}, maîtrises {result.MasteriesCreated}.");
+    return;
+}
 
 if (app.Environment.IsDevelopment())
 {
