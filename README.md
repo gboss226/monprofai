@@ -186,6 +186,67 @@ PostgreSQL avec EF Core migrations.
 - **Courses** - Cours
 - **Lessons** - Leçons/contenus
 - **UserCourses** - Inscriptions et progression
+- **LearnerProfiles** - Profil apprenant (classe, matières difficiles, objectif, façon d'apprendre)
+- **NotionMasteries** - Niveau de maîtrise d'une notion par un élève
+
+### Référentiel des notions
+
+Le programme scolaire est découpé en **matières → chapitres → notions**, avec un graphe de prérequis entre notions. La maîtrise d'un élève (`NotionMasteries`) pointe vers une notion de ce référentiel.
+
+```mermaid
+erDiagram
+    Subjects ||--o{ Chapters : "contient"
+    Chapters ||--o{ Notions : "contient"
+    Notions ||--o{ NotionPrerequisites : "requiert (NotionId)"
+    Notions ||--o{ NotionPrerequisites : "est requise par (PrerequisiteNotionId)"
+    Notions ||--o{ NotionMasteries : "maîtrisée par"
+    Users ||--o{ NotionMasteries : "a"
+
+    Subjects {
+        uuid Id PK
+        varchar64 Code UK "ex. maths"
+        varchar128 Name "ex. Mathématiques"
+    }
+    Chapters {
+        uuid Id PK
+        uuid SubjectId FK
+        int SchoolLevel "0 = 6ème ... 6 = Terminale"
+        varchar256 Title
+        int Order "> 0"
+    }
+    Notions {
+        uuid Id PK
+        uuid ChapterId FK
+        varchar256 Title
+        varchar500 ShortDescription "facultatif"
+        int Order "> 0"
+    }
+    NotionPrerequisites {
+        uuid NotionId PK, FK
+        uuid PrerequisiteNotionId PK, FK
+    }
+    NotionMasteries {
+        uuid Id PK
+        uuid UserId FK
+        uuid NotionId FK
+        float MasteryScore
+        int AttemptCount
+    }
+```
+
+| Table | Rôle | Contraintes principales |
+|-------|------|-------------------------|
+| `Subjects` | Matière (ex. maths) | `Code` unique |
+| `Chapters` | Chapitre d'une matière pour une classe | Unicité (`SubjectId`, `SchoolLevel`, `Order`), `Order > 0` |
+| `Notions` | Notion à maîtriser dans un chapitre | Unicité (`ChapterId`, `Order`), `Order > 0` |
+| `NotionPrerequisites` | `NotionId` dépend de `PrerequisiteNotionId` | Clé primaire composite, une notion ne peut pas être son propre prérequis |
+| `NotionMasteries` | Maîtrise d'une notion par un élève | Unicité (`UserId`, `NotionId`) |
+
+**Règles de suppression** : le référentiel est protégé. On ne peut pas supprimer une matière qui a des chapitres, un chapitre qui a des notions, une notion encore requise par une autre ou une notion déjà travaillée par un élève (`RESTRICT`). Supprimer une notion supprime seulement ses propres liens de prérequis (`CASCADE`).
+
+`SchoolLevel` reprend l'énumération du profil apprenant : 0 = 6ème, 1 = 5ème, 2 = 4ème, 3 = 3ème, 4 = 2nde, 5 = 1ère, 6 = Terminale.
+
+> Les noms de tables suivent la convention EF Core du projet (PascalCase au pluriel) : `subjects` → `Subjects`, `notion_prerequisites` → `NotionPrerequisites`, etc.
 
 ## 🚢 Déploiement
 
