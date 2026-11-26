@@ -28,6 +28,39 @@ public class ExerciseRepository : IExerciseRepository
             .Include(e => e.Notion)
             .ThenInclude(n => n.Chapter)
             .ThenInclude(c => c.Subject)
+            .Include(e => e.Hints.OrderBy(h => h.Level))
+            .Include(e => e.Attempts.OrderBy(a => a.CreatedAt))
+            .AsSplitQuery()
             .FirstOrDefaultAsync(e => e.Id == exerciseId && e.UserId == userId, cancellationToken);
+    }
+
+    public async Task<bool> AddHintAsync(ExerciseHint hint, ExerciseStatus status, CancellationToken cancellationToken = default)
+    {
+        await SetStatusAsync(hint.ExerciseId, status, cancellationToken);
+        _context.ExerciseHints.Add(hint);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            // Unique (ExerciseId, Level): the same hint was unlocked by another request meanwhile.
+            _context.ChangeTracker.Clear();
+            return false;
+        }
+    }
+
+    public async Task AddAttemptAsync(ExerciseAttempt attempt, ExerciseStatus status, CancellationToken cancellationToken = default)
+    {
+        await SetStatusAsync(attempt.ExerciseId, status, cancellationToken);
+        _context.ExerciseAttempts.Add(attempt);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task SetStatusAsync(Guid exerciseId, ExerciseStatus status, CancellationToken cancellationToken)
+    {
+        var exercise = await _context.Exercises.FirstAsync(e => e.Id == exerciseId, cancellationToken);
+        exercise.Status = status;
     }
 }

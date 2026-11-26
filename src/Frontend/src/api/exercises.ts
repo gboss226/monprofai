@@ -1,6 +1,6 @@
 import { isAxiosError } from 'axios'
 import client from './client'
-import { CreatedExercise, Exercise } from '../types/exercise'
+import { CreatedExercise, Exercise, ExerciseAttempt, ExerciseHint } from '../types/exercise'
 
 export class ExerciseError extends Error {
   constructor(
@@ -53,6 +53,36 @@ export async function transcribeExercise(photo: Blob): Promise<string> {
       throw new ExerciseError('Tu as envoyé beaucoup de demandes. Réessaie dans quelques minutes.', 'RateLimited')
     }
     throw new ExerciseError("La photo n'a pas pu être envoyée. Vérifie ta connexion et réessaie.")
+  }
+}
+
+function toExerciseError(error: unknown, fallback: string): ExerciseError {
+  if (isAxiosError(error) && error.response?.data?.message) {
+    return new ExerciseError(error.response.data.message, error.response.data.code)
+  }
+  if (isAxiosError(error) && error.response?.status === 429) {
+    return new ExerciseError('Tu as envoyé beaucoup de demandes. Réessaie dans quelques minutes.', 'RateLimited')
+  }
+  return new ExerciseError(fallback)
+}
+
+/** Unlocks the hint of `level`. Rejects with code "HintLocked" when the rules forbid it for now. */
+export async function unlockHint(exerciseId: string, level: number): Promise<ExerciseHint> {
+  try {
+    const response = await client.post<ExerciseHint>(`/exercises/${exerciseId}/hints`, { level }, { timeout: 90_000 })
+    return response.data
+  } catch (error) {
+    throw toExerciseError(error, "L'indice n'a pas pu être chargé. Réessaie.")
+  }
+}
+
+/** Has the model check an answer: right, or where the mistake is, without giving the solution. */
+export async function submitAnswer(exerciseId: string, answer: string): Promise<ExerciseAttempt> {
+  try {
+    const response = await client.post<ExerciseAttempt>(`/exercises/${exerciseId}/attempts`, { answer }, { timeout: 90_000 })
+    return response.data
+  } catch (error) {
+    throw toExerciseError(error, "Ta réponse n'a pas pu être vérifiée. Réessaie.")
   }
 }
 
