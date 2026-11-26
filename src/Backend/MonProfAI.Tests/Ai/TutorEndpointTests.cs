@@ -60,6 +60,8 @@ public class TutorEndpointTests
         var profiles = new Mock<ILearnerProfileRepository>();
         var notions = new Mock<INotionRepository>();
         notions.Setup(r => r.GetByIdAsync(KnownNotion.Id, It.IsAny<CancellationToken>())).ReturnsAsync(KnownNotion);
+        notions.Setup(r => r.GetMasteriesAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Dictionary<Guid, NotionMastery>());
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");

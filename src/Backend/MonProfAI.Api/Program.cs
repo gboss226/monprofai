@@ -17,8 +17,11 @@ using MonProfAI.Infrastructure.Services;
 // `dotnet run -- seed` applies migrations, loads the test data and exits (see README).
 const string SeedCommand = "seed";
 var seedMode = args.Contains(SeedCommand);
+// `dotnet run -- tutor-eval` plays test sessions against the real model and grades the tutor (see README).
+var tutorEvalMode = args.Contains(TutorEval.Command);
 
-var builder = WebApplication.CreateBuilder(args.Where(a => a != SeedCommand).ToArray());
+var builder = WebApplication.CreateBuilder(
+    args.Where(a => a != SeedCommand && a != TutorEval.Command).ToArray());
 
 // Load environment variables from .env file or system
 builder.Configuration.AddEnvironmentVariables();
@@ -115,6 +118,19 @@ if (seedMode)
         $"chapitres {result.ChaptersCreated}, notions {result.NotionsCreated}, " +
         $"prérequis {result.PrerequisitesCreated}, élèves {result.UsersCreated}, " +
         $"profils {result.ProfilesCreated}, maîtrises {result.MasteriesCreated}.");
+    return;
+}
+
+if (tutorEvalMode)
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        Console.Error.WriteLine("L'évaluation du tuteur ne tourne qu'en Development (elle utilise les comptes du seed).");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    Environment.ExitCode = await TutorEval.RunAsync(app);
     return;
 }
 
