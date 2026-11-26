@@ -1,5 +1,12 @@
 import axios, { AxiosInstance } from 'axios'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    // Set on requests whose 401 is handled by the caller (e.g. the session check).
+    skipAuthRedirect?: boolean
+  }
+}
+
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 const client: AxiosInstance = axios.create({
@@ -13,7 +20,7 @@ const client: AxiosInstance = axios.create({
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !error.config?.skipAuthRedirect) {
       // Clear auth state and redirect to login
       window.location.href = '/login'
     }
