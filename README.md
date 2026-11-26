@@ -204,6 +204,25 @@ Chaque erreur contient un `message` en français à afficher tel quel à l'élè
 | `TimeoutSeconds` | `60` | Délai maximal d'un appel |
 | `RateLimit:PermitLimit` / `RateLimit:WindowMinutes` | `30` / `60` | Nombre de questions par élève et par fenêtre de temps |
 
+### Le prompt du tuteur
+
+Les consignes pédagogiques du tuteur sont dans [`TutorSystemPrompt.md`](src/Backend/MonProfAI.Application/UseCases/Tutor/TutorSystemPrompt.md), un fichier à part qu'on peut modifier sans toucher au code (il est intégré à la compilation : relance l'API après une modification). Il décrit :
+
+- la séance : expliquer la notion au niveau de l'élève, puis poser une question courte de vérification ; changer d'approche après une erreur au lieu de répéter ;
+- les devoirs : ne jamais faire l'exercice à la place de l'élève, l'aider à démarrer ;
+- le ton : bienveillant, encourageant, adapté à l'âge ;
+- les limites : refus poli des sujets hors scolaire ou inappropriés pour des mineurs, numéros d'aide (3018, 119, 3114) si l'élève exprime de la détresse.
+
+`TutorPromptBuilder` remplace les balises `{{ELEVE}}` (classe, façon d'apprendre préférée, objectif, matières difficiles) et `{{NOTION}}` (notion, chapitre, maîtrise de l'élève et de chaque prérequis).
+
+Pour vérifier le tuteur après une modification du prompt, avec une clé dans `.env` et le seed chargé :
+
+```bash
+dotnet run --project src/Backend/MonProfAI.Api -- tutor-eval
+```
+
+La commande joue une séance sur 3 notions du seed (fractions en 4ème, Thalès en 3ème, équations avec un compte sans profil). Un élève simulé répond faux, puis juste, demande qu'on fasse son exercice, puis part hors sujet. Un correcteur IA vérifie chaque réponse du tuteur, et un rapport Markdown est écrit. Elle appelle l'API payante : compter quelques centimes par passage.
+
 ### Changer de fournisseur
 
 Tout le code passe par l'interface `IAiChatService` (`MonProfAI.Application`). Pour changer de fournisseur, il suffit d'écrire une autre implémentation à côté de `AnthropicChatService` (`MonProfAI.Infrastructure/Ai`) et de l'ajouter dans `AiSetup` (`MonProfAI.Api/Ai`) sous un nouveau nom de `Provider`.
