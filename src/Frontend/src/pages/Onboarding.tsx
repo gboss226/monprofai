@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { completeOnboarding } from '../api/learnerProfile'
+import { useEffect, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { completeOnboarding, getMyProfile } from '../api/learnerProfile'
 import { useAuthStore } from '../store/authStore'
 import {
   GOALS,
@@ -13,7 +13,18 @@ const TOTAL_STEPS = 4
 
 export function Onboarding() {
   const navigate = useNavigate()
+  const profile = useAuthStore((state) => state.profile)
   const setProfile = useAuthStore((state) => state.setProfile)
+
+  useEffect(() => {
+    if (!profile) {
+      getMyProfile()
+        .then(setProfile)
+        .catch(() => {
+          // non-blocking: the questionnaire can still be filled in
+        })
+    }
+  }, [profile, setProfile])
 
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -74,10 +85,25 @@ export function Onboarding() {
     }
   }
 
+  // Once completed, the questionnaire is never shown again.
+  if (profile?.onboardingCompleted) {
+    return <Navigate to="/dashboard" replace />
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center px-4">
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-lg">
-        <div className="w-full bg-gray-200 rounded-full h-2 mb-8">
+        <p className="text-sm text-gray-500 mb-2">
+          Question {step + 1} sur {TOTAL_STEPS}
+        </p>
+        <div
+          className="w-full bg-gray-200 rounded-full h-2 mb-8"
+          role="progressbar"
+          aria-valuemin={1}
+          aria-valuemax={TOTAL_STEPS}
+          aria-valuenow={step + 1}
+          aria-label="Progression du questionnaire"
+        >
           <div
             className="bg-blue-600 h-2 rounded-full transition-all"
             style={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }}
@@ -222,6 +248,11 @@ export function Onboarding() {
                 : 'Suivant'}
           </button>
         </div>
+
+        <p className="text-xs text-gray-400 mt-6">
+          Ces réponses servent uniquement à adapter tes cours. Tu pourras passer
+          ce questionnaire et y revenir plus tard depuis ton tableau de bord.
+        </p>
       </div>
     </div>
   )

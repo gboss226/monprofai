@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -54,6 +55,10 @@ public class LearnerProfileController : ControllerBase
                 request.PreferredLearningStyle
             ));
             return Ok(profile);
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
         catch (InvalidOperationException)
         {
