@@ -40,16 +40,20 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/tutor/:notionId"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<p className="p-6 text-gray-500">Chargement…</p>}>
-                <TutorChat />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
+        {/* Same element for both paths: starting a conversation switches the URL without remounting the chat. */}
+        {['/tutor/:notionId', '/tutor/c/:conversationId'].map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <ProtectedRoute>
+                <Suspense fallback={<p className="p-6 text-gray-500">Chargement…</p>}>
+                  <TutorChat />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+        ))}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>

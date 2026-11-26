@@ -1,14 +1,15 @@
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { isAxiosError } from 'axios'
+import { getConversation } from '../api/conversations'
 import { findNotion, getReferential } from '../api/notions'
 import { streamTutorAnswer, TutorError } from '../api/tutor'
 import { MathMarkdown } from '../components/MathMarkdown'
 import { SCHOOL_LEVELS } from '../types/learnerProfile'
-import { ChatMessage, ChatTurn, NotionContext } from '../types/tutor'
+import { ChatMessage, NotionContext } from '../types/tutor'
 
-/** Matches the backend limits (AskTutorQueryValidator). */
+/** Matches the backend limit (AskTutorQueryValidator). */
 const MAX_MESSAGE_LENGTH = 2000
-const MAX_HISTORY_TURNS = 20
 
 const STARTERS = [
   'Explique-moi cette notion simplement',
@@ -18,8 +19,21 @@ const STARTERS = [
 
 let nextId = 1
 
+/**
+ * Chat with the tutor. Two entry points:
+ * - /tutor/:notionId starts a new conversation about a notion (the URL becomes /tutor/c/:id once it is saved);
+ * - /tutor/c/:conversationId resumes one of the student's conversations.
+ */
 export function TutorChat() {
-  const { notionId } = useParams<{ notionId: string }>()
+  const params = useParams<{ notionId?: string; conversationId?: string }>()
+  const navigate = useNavigate()
+
+  const [conversationId, setConversationId] = useState<string | null>(params.conversationId ?? null)
+  // Avoids reloading the conversation this page just created when the URL switches to it.
+  const conversationIdRef = useRef<string | null>(null)
+  const [notionId, setNotionId] = useState<string | null>(params.notionId ?? null)
+  const [loading, setLoading] = useState(Boolean(params.conversationId))
+
   const [context, setContext] = useState<NotionContext | null>(null)
   const [contextError, setContextError] = useState<string | null>(null)
 
@@ -32,6 +46,30 @@ export function TutorChat() {
   const stickToBottom = useRef(true)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  // Resume a saved conversation.
+  useEffect(() => {
+    const id = params.conversationId
+    if (!id || id === conversationIdRef.current) return
+    conversationIdRef.current = id
+    setLoading(true)
+    getConversation(id)
+      .then((conversation) => {
+        setConversationId(conversation.id)
+        setNotionId(conversation.notionId)
+        setMessages(
+          conversation.messages.map((m) => ({ id: nextId++, role: m.role, content: m.content, status: 'done' }))
+        )
+      })
+      .catch((error) =>
+        setContextError(
+          isAxiosError(error) && error.response?.status === 404
+            ? 'Cette conversation est introuvable.'
+            : 'Impossible de charger la conversation. Recharge la page.'
+        )
+      )
+      .finally(() => setLoading(false))
+  }, [params.conversationId])
+
   useEffect(() => {
     if (!notionId) return
     getReferential()
@@ -42,6 +80,16 @@ export function TutorChat() {
       })
       .catch(() => setContextError('Impossible de charger la notion. Recharge la page.'))
   }, [notionId])
+
+  const adoptConversation = (id: string) => {
+    if (conversationIdRef.current === id) return
+    conversationIdRef.current = id
+    setConversationId(id)
+    // A reload or a shared link now resumes this conversation instead of starting a new one.
+    navigate(`/tutor/c/${id}`, { replace: true })
+  }
+
+  const ready = !loading && !contextError && (notionId ? Boolean(context) : Boolean(conversationId))
 
   // Stop a running answer when leaving the page.
   useEffect(() => () => abortRef.current?.abort(), [])
@@ -62,13 +110,7 @@ export function TutorChat() {
 
   const send = async (text: string) => {
     const message = text.trim()
-    if (!message || streaming || !notionId) return
-
-    // Only completed exchanges are sent back as context; failed answers would confuse the model.
-    const history: ChatTurn[] = messages
-      .filter((m) => m.status === 'done' && m.content.trim())
-      .map(({ role, content }) => ({ role, content }))
-      .slice(-MAX_HISTORY_TURNS)
+    if (!message || streaming || !ready) return
 
     const userMessage: ChatMessage = { id: nextId++, role: 'user', content: message, status: 'done' }
     const answer: ChatMessage = { id: nextId++, role: 'assistant', content: '', status: 'streaming' }
@@ -80,13 +122,20 @@ export function TutorChat() {
     const controller = new AbortController()
     abortRef.current = controller
     try {
+      // The server keeps the conversation and gives the model its latest messages: no history to send.
       await streamTutorAnswer(
-        { message, history, notionId },
-        (chunk) => updateMessage(answer.id, (m) => ({ ...m, content: m.content + chunk })),
+        conversationIdRef.current
+          ? { message, conversationId: conversationIdRef.current }
+          : { message, notionId: notionId ?? undefined },
+        {
+          onConversation: adoptConversation,
+          onChunk: (chunk) => updateMessage(answer.id, (m) => ({ ...m, content: m.content + chunk })),
+        },
         controller.signal
       )
       updateMessage(answer.id, (m) => ({ ...m, status: 'done' }))
     } catch (error) {
+      if (error instanceof TutorError && error.conversationId) adoptConversation(error.conversationId)
       if (controller.signal.aborted) {
         updateMessage(answer.id, (m) => ({
           ...m,
@@ -139,7 +188,7 @@ export function TutorChat() {
           <Link
             to="/tutor"
             className="text-gray-500 hover:text-gray-800 p-2 -ml-2 rounded shrink-0"
-            aria-label="Changer de notion"
+            aria-label="Mes conversations et notions"
           >
             ←
           </Link>
@@ -148,7 +197,8 @@ export function TutorChat() {
               {context ? `${context.subject.name} · ${level} · ${context.chapter.title}` : 'Prof IA'}
             </p>
             <h1 className="font-semibold text-gray-900 leading-snug line-clamp-2">
-              {context?.notion.title ?? (contextError ? 'Notion introuvable' : 'Chargement…')}
+              {context?.notion.title ??
+                (contextError ? 'Introuvable' : loading || notionId ? 'Chargement…' : 'Discussion libre')}
             </h1>
           </div>
         </div>
@@ -161,12 +211,14 @@ export function TutorChat() {
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
               {contextError}{' '}
               <Link to="/tutor" className="underline font-medium">
-                Choisir une autre notion
+                Retour à mes conversations
               </Link>
             </div>
           )}
 
-          {context && messages.length === 0 && (
+          {loading && <p className="text-center text-gray-500 py-6">Chargement de la conversation…</p>}
+
+          {ready && messages.length === 0 && (
             <div className="text-center py-6">
               <p className="text-gray-700 mb-1">Pose ta question sur cette notion.</p>
               <p className="text-sm text-gray-500 mb-5">
@@ -209,7 +261,7 @@ export function TutorChat() {
             onKeyDown={onKeyDown}
             rows={1}
             maxLength={MAX_MESSAGE_LENGTH}
-            disabled={!context}
+            disabled={!ready}
             placeholder="Écris ta question…"
             // text-base (16px) stops iOS from zooming into the field.
             className="flex-1 resize-none rounded-2xl border border-gray-300 px-4 py-2.5 text-base leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
@@ -225,7 +277,7 @@ export function TutorChat() {
           ) : (
             <button
               type="submit"
-              disabled={!input.trim() || !context}
+              disabled={!input.trim() || !ready}
               className="h-11 px-5 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-40 shrink-0"
             >
               Envoyer

@@ -163,17 +163,28 @@ La clé reste sur le serveur : elle n'est jamais renvoyée au navigateur. Ne la 
 
 ### Interface
 
-Depuis le tableau de bord, **Travailler avec mon prof IA** ouvre `/tutor`. L'élève y choisit une notion, chapitre par chapitre (sa classe est présélectionnée), puis discute avec le tuteur sur `/tutor/:notionId`. Les réponses s'affichent au fur et à mesure, en Markdown, et les formules mathématiques sont rendues avec KaTeX.
+Depuis le tableau de bord, **Travailler avec mon prof IA** ouvre `/tutor`. L'élève y retrouve ses conversations passées (« Reprendre une conversation ») ou choisit une notion, chapitre par chapitre (sa classe est présélectionnée). Une nouvelle séance commence sur `/tutor/:notionId` ; dès la première question, l'adresse devient `/tutor/c/:conversationId`, qu'on peut recharger ou rouvrir plus tard. Les réponses s'affichent au fur et à mesure, en Markdown, et les formules mathématiques sont rendues avec KaTeX.
+
+### Conversations
+
+Chaque question et chaque réponse sont enregistrées dans les tables `Conversations` (élève, notion, dates) et `Messages` (conversation, rôle, contenu, date). À chaque question, les 20 derniers messages de la conversation sont renvoyés au modèle, qui garde ainsi le fil ; les plus anciens ne sont plus envoyés, pour limiter le coût de chaque appel. Une réponse interrompue (erreur, bouton « Arrêter ») est gardée telle que l'élève l'a vue.
+
+Un élève n'accède qu'à ses propres conversations : celle d'un autre élève répond `404`, exactement comme une conversation qui n'existe pas.
 
 ### Routes
 
 `GET /api/notions` (authentifiée) : matières → chapitres → notions, triés pour l'affichage.
 
-`POST /api/tutor/ask` (authentifiée), corps : `{ "message": "...", "notionId": "...", "history": [{ "role": "user" | "assistant", "content": "..." }] }`. `notionId` est facultatif : quand il est fourni, le tuteur reste centré sur cette notion.
+`GET /api/conversations` (authentifiée) : mes conversations, de la plus récente à la plus ancienne. `GET /api/conversations/{id}` : une de mes conversations avec ses messages.
 
-La réponse arrive en streaming (Server-Sent Events) :
+`POST /api/tutor/ask` (authentifiée), corps : `{ "message": "...", "conversationId": "..." }` pour continuer une conversation, ou `{ "message": "...", "notionId": "..." }` pour en commencer une (la notion est facultative). L'historique n'est pas envoyé par le client : le serveur le relit en base.
+
+La réponse arrive en streaming (Server-Sent Events) ; le premier événement donne la conversation où la question a été enregistrée :
 
 ```
+event: conversation
+data: {"conversationId":"..."}
+
 data: {"text":"Une fraction "}
 
 data: {"text":"représente un partage..."}
@@ -185,6 +196,7 @@ data: {}
 | Situation | Réponse |
 |-----------|---------|
 | Pas connecté | `401` |
+| Conversation inconnue ou d'un autre élève | `404`, `code: "ConversationNotFound"` |
 | Question vide ou trop longue (> 2000 caractères) | `400` |
 | Limite par élève atteinte | `429`, `code: "RateLimited"` |
 | Clé absente ou invalide, quota du fournisseur dépassé, fournisseur indisponible | `503` |
@@ -321,6 +333,8 @@ erDiagram
 | `Notions` | Notion à maîtriser dans un chapitre | Unicité (`ChapterId`, `Order`), `Order > 0` |
 | `NotionPrerequisites` | `NotionId` dépend de `PrerequisiteNotionId` | Clé primaire composite, une notion ne peut pas être son propre prérequis |
 | `NotionMasteries` | Maîtrise d'une notion par un élève | Unicité (`UserId`, `NotionId`) |
+| `Conversations` | Séance d'un élève avec le tuteur, sur une notion ou libre | Supprimée avec l'élève (`CASCADE`), notion protégée (`RESTRICT`) |
+| `Messages` | Message d'une conversation (rôle `0` = élève, `1` = tuteur) | Supprimé avec la conversation (`CASCADE`) |
 
 **Règles de suppression** : le référentiel est protégé. On ne peut pas supprimer une matière qui a des chapitres, un chapitre qui a des notions, une notion encore requise par une autre ou une notion déjà travaillée par un élève (`RESTRICT`). Supprimer une notion supprime seulement ses propres liens de prérequis (`CASCADE`).
 

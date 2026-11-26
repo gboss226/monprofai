@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using MonProfAI.Application.Interfaces;
+using MonProfAI.Application.UseCases.Conversations;
 using MonProfAI.Application.UseCases.Tutor;
 using MonProfAI.Infrastructure.Ai;
 using MonProfAI.Infrastructure.Data;
@@ -93,6 +94,8 @@ public static class TutorEval
             Console.WriteLine($"\n=== {scenario.NotionTitle} ({scenario.StudentEmail}) ===");
             report.Append($"\n## {scenario.NotionTitle}\n\nÉlève : `{scenario.StudentEmail}`\n");
             var history = new List<TutorTurn>();
+            // A real conversation, so the tutor gets its context the same way as in the app.
+            var conversationId = await mediator.Send(new OpenConversationCommand(user.Id, null, notion.Id));
 
             foreach (var step in Enum.GetValues<Step>())
             {
@@ -106,7 +109,7 @@ public static class TutorEval
                 };
 
                 var reply = await CollectAsync(mediator.CreateStream(
-                    new AskTutorQuery(user.Id, studentMessage, history.ToList(), notion.Id)));
+                    new AskTutorQuery(user.Id, conversationId, studentMessage)));
                 history.Add(new TutorTurn("user", studentMessage));
                 history.Add(new TutorTurn("assistant", reply));
 

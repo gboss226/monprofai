@@ -28,6 +28,25 @@ export interface NotionContext {
   subject: SubjectDto
 }
 
+export interface ConversationSummary {
+  id: string
+  notionId: string | null
+  notionTitle: string | null
+  chapterTitle: string | null
+  /** Start of the student's first message. */
+  preview: string
+  messageCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ConversationDetail {
+  id: string
+  notionId: string | null
+  createdAt: string
+  messages: { id: string; role: ChatRole; content: string; createdAt: string }[]
+}
+
 export type ChatRole = 'user' | 'assistant'
 
 export interface ChatTurn {

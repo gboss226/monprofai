@@ -19,6 +19,8 @@ public class MonProfAIDbContext : DbContext
     public DbSet<Chapter> Chapters => Set<Chapter>();
     public DbSet<Notion> Notions => Set<Notion>();
     public DbSet<NotionPrerequisite> NotionPrerequisites => Set<NotionPrerequisite>();
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<ConversationMessage> Messages => Set<ConversationMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -159,6 +161,36 @@ public class MonProfAIDbContext : DbContext
             entity.HasIndex(e => e.PrerequisiteNotionId);
             entity.ToTable(t => t.HasCheckConstraint(
                 "CK_NotionPrerequisites_NotSelf", "\"NotionId\" <> \"PrerequisiteNotionId\""));
+        });
+
+        // Tutor conversations. Deleting a user deletes their conversations and messages;
+        // a notion used by a conversation cannot be deleted (same rule as for mastery history).
+        modelBuilder.Entity<Conversation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Notion)
+                .WithMany()
+                .HasForeignKey(e => e.NotionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // The history page lists a student's conversations, most recent first.
+            entity.HasIndex(e => new { e.UserId, e.UpdatedAt });
+        });
+
+        modelBuilder.Entity<ConversationMessage>(entity =>
+        {
+            entity.ToTable("Messages");
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Conversation)
+                .WithMany(c => c.Messages)
+                .HasForeignKey(e => e.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.Role).IsRequired();
+            entity.Property(e => e.Content).IsRequired();
+            entity.HasIndex(e => new { e.ConversationId, e.CreatedAt });
         });
     }
 }
