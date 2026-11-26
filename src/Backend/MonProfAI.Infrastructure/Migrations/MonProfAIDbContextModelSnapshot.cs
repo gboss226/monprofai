@@ -23,6 +23,37 @@ namespace MonProfAI.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Chapter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SchoolLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId", "SchoolLevel", "Order")
+                        .IsUnique();
+
+                    b.ToTable("Chapters", t =>
+                        {
+                            t.HasCheckConstraint("CK_Chapters_Order_Positive", "\"Order\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.Course", b =>
                 {
                     b.Property<Guid>("Id")
@@ -131,6 +162,38 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.ToTable("Lessons");
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Notion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChapterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ShortDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChapterId", "Order")
+                        .IsUnique();
+
+                    b.ToTable("Notions", t =>
+                        {
+                            t.HasCheckConstraint("CK_Notions_Order_Positive", "\"Order\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.NotionMastery", b =>
                 {
                     b.Property<Guid>("Id")
@@ -149,20 +212,62 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.Property<double>("MasteryScore")
                         .HasColumnType("double precision");
 
-                    b.Property<string>("NotionKey")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                    b.Property<Guid>("NotionId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "NotionKey")
+                    b.HasIndex("NotionId");
+
+                    b.HasIndex("UserId", "NotionId")
                         .IsUnique();
 
                     b.ToTable("NotionMasteries");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.NotionPrerequisite", b =>
+                {
+                    b.Property<Guid>("NotionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PrerequisiteNotionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("NotionId", "PrerequisiteNotionId");
+
+                    b.HasIndex("PrerequisiteNotionId");
+
+                    b.ToTable("NotionPrerequisites", t =>
+                        {
+                            t.HasCheckConstraint("CK_NotionPrerequisites_NotSelf", "\"NotionId\" <> \"PrerequisiteNotionId\"");
+                        });
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Subject", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Subjects");
                 });
 
             modelBuilder.Entity("MonProfAI.Domain.Entities.User", b =>
@@ -233,6 +338,17 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.ToTable("UserCourses");
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Chapter", b =>
+                {
+                    b.HasOne("MonProfAI.Domain.Entities.Subject", "Subject")
+                        .WithMany("Chapters")
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Subject");
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.Course", b =>
                 {
                     b.HasOne("MonProfAI.Domain.Entities.User", "Teacher")
@@ -266,15 +382,53 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.Navigation("Course");
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Notion", b =>
+                {
+                    b.HasOne("MonProfAI.Domain.Entities.Chapter", "Chapter")
+                        .WithMany("Notions")
+                        .HasForeignKey("ChapterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Chapter");
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.NotionMastery", b =>
                 {
+                    b.HasOne("MonProfAI.Domain.Entities.Notion", "Notion")
+                        .WithMany()
+                        .HasForeignKey("NotionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("MonProfAI.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("Notion");
+
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.NotionPrerequisite", b =>
+                {
+                    b.HasOne("MonProfAI.Domain.Entities.Notion", "Notion")
+                        .WithMany("Prerequisites")
+                        .HasForeignKey("NotionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MonProfAI.Domain.Entities.Notion", "PrerequisiteNotion")
+                        .WithMany("RequiredBy")
+                        .HasForeignKey("PrerequisiteNotionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Notion");
+
+                    b.Navigation("PrerequisiteNotion");
                 });
 
             modelBuilder.Entity("MonProfAI.Domain.Entities.UserCourse", b =>
@@ -296,11 +450,28 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Chapter", b =>
+                {
+                    b.Navigation("Notions");
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.Course", b =>
                 {
                     b.Navigation("Enrollments");
 
                     b.Navigation("Lessons");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Notion", b =>
+                {
+                    b.Navigation("Prerequisites");
+
+                    b.Navigation("RequiredBy");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Subject", b =>
+                {
+                    b.Navigation("Chapters");
                 });
 #pragma warning restore 612, 618
         }

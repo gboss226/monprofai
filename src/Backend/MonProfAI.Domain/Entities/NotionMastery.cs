@@ -6,7 +6,8 @@ public class NotionMastery
     public Guid UserId { get; set; }
     public User User { get; set; } = null!;
 
-    public string NotionKey { get; set; } = null!;
+    public Guid NotionId { get; set; }
+    public Notion Notion { get; set; } = null!;
     public double MasteryScore { get; set; }
     public int AttemptCount { get; set; }
 
