@@ -43,6 +43,28 @@ public class AnthropicChatServiceTests
         Assert.Contains(sentCredentials, v => v.Contains(FakeKey));
     }
 
+    [Fact]
+    public async Task StreamReplyAsync_SendsImagesBeforeTheText()
+    {
+        var handler = FakeAnthropicHandler.Streaming("Calcule $x$.");
+        var photo = new byte[] { 0x89, 0x50, 0x4E, 0x47, 1, 2, 3 };
+        var request = new AiChatRequest("Recopie.", new[]
+        {
+            new AiChatMessage(AiChatRole.User, "Recopie l'énoncé.", new[] { new AiImage("image/png", photo) }),
+        });
+
+        await foreach (var _ in NewService(handler).StreamReplyAsync(request)) { }
+
+        using var body = System.Text.Json.JsonDocument.Parse(handler.Bodies.Single());
+        var content = body.RootElement.GetProperty("messages")[0].GetProperty("content");
+        Assert.Equal("image", content[0].GetProperty("type").GetString());
+        Assert.Equal("base64", content[0].GetProperty("source").GetProperty("type").GetString());
+        Assert.Equal("image/png", content[0].GetProperty("source").GetProperty("media_type").GetString());
+        Assert.Equal(Convert.ToBase64String(photo), content[0].GetProperty("source").GetProperty("data").GetString());
+        Assert.Equal("text", content[1].GetProperty("type").GetString());
+        Assert.Equal("Recopie l'énoncé.", content[1].GetProperty("text").GetString());
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.TooManyRequests, "rate_limit_error", AiErrorKind.QuotaExceeded)]
     [InlineData(HttpStatusCode.PaymentRequired, "billing_error", AiErrorKind.QuotaExceeded)]

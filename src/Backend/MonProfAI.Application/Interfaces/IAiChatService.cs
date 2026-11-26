@@ -17,7 +17,15 @@ public enum AiChatRole
     Assistant,
 }
 
-public sealed record AiChatMessage(AiChatRole Role, string Content);
+/// <param name="Images">Pictures sent with the text (student messages only), e.g. a photo of an exercise.</param>
+public sealed record AiChatMessage(AiChatRole Role, string Content, IReadOnlyList<AiImage>? Images = null);
+
+/// <param name="MediaType">"image/jpeg", "image/png", "image/webp" or "image/gif".</param>
+public sealed record AiImage(string MediaType, byte[] Data)
+{
+    public static readonly IReadOnlySet<string> SupportedMediaTypes =
+        new HashSet<string> { "image/jpeg", "image/png", "image/webp", "image/gif" };
+}
 
 /// <param name="SystemPrompt">Instructions for the model, never shown to the student.</param>
 /// <param name="Messages">Conversation so far, oldest first, ending with the student's new message.</param>

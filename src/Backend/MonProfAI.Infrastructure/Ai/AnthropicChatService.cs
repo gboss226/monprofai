@@ -113,9 +113,29 @@ public sealed class AnthropicChatService : IAiChatService
         }
     }
 
-    private static BetaMessageParam ToParam(AiChatMessage message) => message.Role == AiChatRole.Assistant
-        ? new BetaAssistantMessageParam { Content = message.Content }
-        : new BetaUserMessageParam { Content = message.Content };
+    private static BetaMessageParam ToParam(AiChatMessage message)
+    {
+        if (message.Role == AiChatRole.Assistant)
+            return new BetaAssistantMessageParam { Content = message.Content };
+        if (message.Images is not { Count: > 0 } images)
+            return new BetaUserMessageParam { Content = message.Content };
+
+        // Images first, then the text that refers to them.
+        var blocks = new List<BetaContentBlockParam>();
+        foreach (var image in images)
+        {
+            blocks.Add(new BetaImageBlockParam
+            {
+                Source = new BetaBase64ImageSource
+                {
+                    Data = Convert.ToBase64String(image.Data),
+                    MediaType = image.MediaType,
+                },
+            });
+        }
+        blocks.Add(new BetaTextBlockParam { Text = message.Content });
+        return new BetaUserMessageParam { Content = blocks };
+    }
 
     private AiServiceException Translate(Exception ex)
     {
