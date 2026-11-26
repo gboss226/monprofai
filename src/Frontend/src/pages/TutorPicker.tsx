@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getReferential } from '../api/notions'
 import { getMyProfile } from '../api/learnerProfile'
+import { PastConversations } from '../components/PastConversations'
 import { useAuthStore } from '../store/authStore'
 import { SCHOOL_LEVELS } from '../types/learnerProfile'
 import { ChapterDto, SubjectDto } from '../types/tutor'
@@ -64,6 +65,9 @@ export function TutorPicker() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6">
+        <PastConversations />
+
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-1">Nouvelle séance</h2>
         <p className="text-gray-700 mb-5">Choisis la notion sur laquelle tu veux travailler.</p>
 
         {loadError && (

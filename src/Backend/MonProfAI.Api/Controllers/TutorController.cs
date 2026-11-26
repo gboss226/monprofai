@@ -8,13 +8,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MonProfAI.Api.Ai;
 using MonProfAI.Application.Interfaces;
+using MonProfAI.Application.UseCases.Conversations;
 using MonProfAI.Application.UseCases.Tutor;
 
 namespace MonProfAI.Api.Controllers;
 
 /// <summary>
-/// AI tutor. Answers stream as Server-Sent Events:
-/// <c>data: {"text":"..."}</c> for each chunk, then <c>event: done</c>,
+/// AI tutor. Answers stream as Server-Sent Events: first <c>event: conversation</c> with
+/// <c>{"conversationId"}</c>, then <c>data: {"text":"..."}</c> for each chunk, then <c>event: done</c>,
 /// or <c>event: error</c> with <c>{"code","message"}</c> if the provider fails mid-answer.
 /// Failures before the first chunk come back as a plain JSON error with an HTTP status instead.
 /// </summary>
@@ -49,15 +50,35 @@ public class TutorController : ControllerBase
             return;
         }
 
-        var query = new AskTutorQuery(userId, request.Message ?? string.Empty, request.History, request.NotionId);
-        var validation = await _validator.ValidateAsync(query, cancellationToken);
+        // Check the question before creating anything, so an invalid one leaves no empty conversation behind.
+        var message = request.Message ?? string.Empty;
+        var validation = await _validator.ValidateAsync(new AskTutorQuery(userId, Guid.Empty, message), cancellationToken);
         if (!validation.IsValid)
         {
             await WriteJsonErrorAsync(StatusCodes.Status400BadRequest, "InvalidRequest",
-                string.Join(", ", validation.Errors.Select(e => e.ErrorMessage)), cancellationToken);
+                string.Join(", ", validation.Errors.Select(e => e.ErrorMessage)), null, cancellationToken);
             return;
         }
 
+        Guid conversationId;
+        try
+        {
+            conversationId = await _mediator.Send(
+                new OpenConversationCommand(userId, request.ConversationId, request.NotionId), cancellationToken);
+        }
+        catch (ConversationNotFoundException)
+        {
+            await WriteJsonErrorAsync(StatusCodes.Status404NotFound, "ConversationNotFound",
+                "Cette conversation est introuvable.", null, cancellationToken);
+            return;
+        }
+        catch (ValidationException ex)
+        {
+            await WriteJsonErrorAsync(StatusCodes.Status400BadRequest, "InvalidRequest", ex.Message, null, cancellationToken);
+            return;
+        }
+
+        var query = new AskTutorQuery(userId, conversationId, message);
         await using var chunks = _mediator.CreateStream(query, cancellationToken).GetAsyncEnumerator(cancellationToken);
 
         // Wait for the first chunk before committing to a stream, so that early failures
@@ -69,7 +90,8 @@ public class TutorController : ControllerBase
         }
         catch (AiServiceException ex)
         {
-            await WriteJsonErrorAsync(StatusFor(ex.Kind), ex.Kind.ToString(), ex.StudentMessage, cancellationToken);
+            // The question is saved: the conversation id lets the client keep writing to it.
+            await WriteJsonErrorAsync(StatusFor(ex.Kind), ex.Kind.ToString(), ex.StudentMessage, conversationId, cancellationToken);
             return;
         }
 
@@ -80,6 +102,7 @@ public class TutorController : ControllerBase
 
         try
         {
+            await WriteEventAsync("conversation", new { conversationId }, cancellationToken);
             while (hasChunk)
             {
                 await WriteEventAsync(null, new { text = chunks.Current }, cancellationToken);
@@ -106,10 +129,11 @@ public class TutorController : ControllerBase
         _ => StatusCodes.Status503ServiceUnavailable,
     };
 
-    private async Task WriteJsonErrorAsync(int status, string code, string message, CancellationToken cancellationToken)
+    private async Task WriteJsonErrorAsync(
+        int status, string code, string message, Guid? conversationId, CancellationToken cancellationToken)
     {
         Response.StatusCode = status;
-        await Response.WriteAsJsonAsync(new { code, message }, cancellationToken);
+        await Response.WriteAsJsonAsync(new { code, message, conversationId }, cancellationToken);
     }
 
     private async Task WriteEventAsync(string? eventName, object payload, CancellationToken cancellationToken)
@@ -122,4 +146,6 @@ public class TutorController : ControllerBase
     }
 }
 
-public record AskTutorRequest(string? Message, List<TutorTurn>? History, Guid? NotionId = null);
+/// <param name="ConversationId">Conversation to continue. Omit it to start a new one about <paramref name="NotionId"/>.</param>
+/// <param name="NotionId">Notion of a new conversation. Ignored when continuing one.</param>
+public record AskTutorRequest(string? Message, Guid? ConversationId = null, Guid? NotionId = null);

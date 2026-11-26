@@ -54,6 +54,59 @@ namespace MonProfAI.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Conversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("NotionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NotionId");
+
+                    b.HasIndex("UserId", "UpdatedAt");
+
+                    b.ToTable("Conversations");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.ConversationMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId", "CreatedAt");
+
+                    b.ToTable("Messages", (string)null);
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.Course", b =>
                 {
                     b.Property<Guid>("Id")
@@ -349,6 +402,35 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.Navigation("Subject");
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Conversation", b =>
+                {
+                    b.HasOne("MonProfAI.Domain.Entities.Notion", "Notion")
+                        .WithMany()
+                        .HasForeignKey("NotionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("MonProfAI.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Notion");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.ConversationMessage", b =>
+                {
+                    b.HasOne("MonProfAI.Domain.Entities.Conversation", "Conversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.Course", b =>
                 {
                     b.HasOne("MonProfAI.Domain.Entities.User", "Teacher")
@@ -453,6 +535,11 @@ namespace MonProfAI.Infrastructure.Migrations
             modelBuilder.Entity("MonProfAI.Domain.Entities.Chapter", b =>
                 {
                     b.Navigation("Notions");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Conversation", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("MonProfAI.Domain.Entities.Course", b =>

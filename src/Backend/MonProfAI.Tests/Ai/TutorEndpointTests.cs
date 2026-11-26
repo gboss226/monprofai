@@ -2,12 +2,16 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
 using MonProfAI.Application.Interfaces;
 using MonProfAI.Domain.Entities;
+using MonProfAI.Infrastructure.Data;
 using MonProfAI.Infrastructure.Services;
 using Xunit;
 
@@ -62,6 +66,7 @@ public class TutorEndpointTests
         notions.Setup(r => r.GetByIdAsync(KnownNotion.Id, It.IsAny<CancellationToken>())).ReturnsAsync(KnownNotion);
         notions.Setup(r => r.GetMasteriesAsync(It.IsAny<Guid>(), It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new Dictionary<Guid, NotionMastery>());
+        var databaseName = Guid.NewGuid().ToString();
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -72,17 +77,27 @@ public class TutorEndpointTests
                 services.AddSingleton<IAiChatService>(fake);
                 services.AddScoped(_ => profiles.Object);
                 services.AddScoped(_ => notions.Object);
+                // Conversations are saved for real, in an in-memory database private to this test.
+                services.RemoveAll<DbContextOptions<MonProfAIDbContext>>();
+                services.AddDbContext<MonProfAIDbContext>(o => o.UseInMemoryDatabase(databaseName));
             });
         });
         return (factory, fake);
     }
 
-    private static async Task<HttpClient> AuthenticatedClient(WebApplicationFactory<Program> factory)
+    private static async Task<HttpClient> AuthenticatedClient(WebApplicationFactory<Program> factory, Guid? userId = null)
     {
         var client = factory.CreateClient();
-        var (token, _) = await new AuthService(JwtSecret).GenerateTokensAsync(Guid.NewGuid());
+        var (token, _) = await new AuthService(JwtSecret).GenerateTokensAsync(userId ?? Guid.NewGuid());
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
+    }
+
+    private static Guid ConversationIdFrom(string sseBody)
+    {
+        var match = Regex.Match(sseBody, "event: conversation\ndata: \\{\"conversationId\":\"([0-9a-f-]+)\"\\}");
+        Assert.True(match.Success, "No conversation event in: " + sseBody);
+        return Guid.Parse(match.Groups[1].Value);
     }
 
     private static Task<HttpResponseMessage> Ask(HttpClient client, string message = "C'est quoi Pythagore ?") =>
@@ -112,7 +127,11 @@ public class TutorEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
-        Assert.Equal("data: {\"text\":\"Bonjour\"}\n\ndata: {\"text\":\" !\"}\n\nevent: done\ndata: {}\n\n", body);
+        var conversationId = ConversationIdFrom(body);
+        Assert.Equal(
+            $"event: conversation\ndata: {{\"conversationId\":\"{conversationId}\"}}\n\n" +
+            "data: {\"text\":\"Bonjour\"}\n\ndata: {\"text\":\" !\"}\n\nevent: done\ndata: {}\n\n",
+            body);
         Assert.Equal("C'est quoi Pythagore ?", fake.LastRequest!.Messages[^1].Content);
         Assert.DoesNotContain(SecretApiKey, body);
     }
@@ -149,8 +168,80 @@ public class TutorEndpointTests
 
         var body = await (await Ask(client)).Content.ReadAsStringAsync();
 
-        Assert.StartsWith("data: {\"text\":\"Le théorème\"}\n\nevent: error\n", body);
+        Assert.Contains("data: {\"text\":\"Le théorème\"}\n\nevent: error\n", body);
         Assert.Contains("n'est pas disponible", body);
+
+        // What the student saw of the answer is kept.
+        var saved = await (await client.GetAsync($"/api/conversations/{ConversationIdFrom(body)}"))
+            .Content.ReadFromJsonAsync<ConversationBody>();
+        Assert.Equal(new[] { "user", "assistant" }, saved!.Messages.Select(m => m.Role));
+        Assert.Equal("Le théorème", saved.Messages[1].Content);
+    }
+
+    [Fact]
+    public async Task Ask_StartsAConversation_ThatTheStudentFindsInHisHistory()
+    {
+        var (factory, _) = CreateApi();
+        using var __ = factory;
+        var client = await AuthenticatedClient(factory);
+
+        var body = await (await client.PostAsJsonAsync("/api/tutor/ask",
+            new { message = "Je bloque sur Pythagore", notionId = KnownNotion.Id })).Content.ReadAsStringAsync();
+        var conversationId = ConversationIdFrom(body);
+
+        var list = await client.GetFromJsonAsync<List<SummaryBody>>("/api/conversations");
+        var summary = Assert.Single(list!);
+        Assert.Equal(conversationId, summary.Id);
+        Assert.Equal(KnownNotion.Id, summary.NotionId);
+        Assert.Equal("Je bloque sur Pythagore", summary.Preview);
+        Assert.Equal(2, summary.MessageCount);
+
+        var conversation = await client.GetFromJsonAsync<ConversationBody>($"/api/conversations/{conversationId}");
+        Assert.Equal(new[] { "Je bloque sur Pythagore", "Bonjour !" }, conversation!.Messages.Select(m => m.Content));
+    }
+
+    [Fact]
+    public async Task Ask_InAnExistingConversation_ReplaysItsMessagesToTheModel()
+    {
+        var (factory, fake) = CreateApi();
+        using var _ = factory;
+        var client = await AuthenticatedClient(factory);
+        var first = await (await client.PostAsJsonAsync("/api/tutor/ask",
+            new { message = "Explique-moi", notionId = KnownNotion.Id })).Content.ReadAsStringAsync();
+        var conversationId = ConversationIdFrom(first);
+        fake.Reply = _ => Chunks("Exact !");
+
+        var second = await (await client.PostAsJsonAsync("/api/tutor/ask",
+            new { message = "Ça fait 5 cm ?", conversationId })).Content.ReadAsStringAsync();
+
+        Assert.Equal(conversationId, ConversationIdFrom(second));
+        Assert.Equal(
+            new[] { "User:Explique-moi", "Assistant:Bonjour !", "User:Ça fait 5 cm ?" },
+            fake.LastRequest!.Messages.Select(m => $"{m.Role}:{m.Content}"));
+        // The notion chosen at the start still frames the conversation.
+        Assert.Contains("« Calculer une longueur avec le théorème de Pythagore »", fake.LastRequest.SystemPrompt);
+    }
+
+    [Fact]
+    public async Task AnotherStudentsConversation_IsInvisibleAndCannotBeContinued()
+    {
+        var (factory, fake) = CreateApi();
+        using var _ = factory;
+        var owner = await AuthenticatedClient(factory);
+        var body = await (await Ask(owner, "Ma question privée")).Content.ReadAsStringAsync();
+        var conversationId = ConversationIdFrom(body);
+        var intruder = await AuthenticatedClient(factory);
+        fake.Reply = _ => Chunks("ne doit pas arriver");
+
+        var read = await intruder.GetAsync($"/api/conversations/{conversationId}");
+        var list = await intruder.GetFromJsonAsync<List<SummaryBody>>("/api/conversations");
+        var write = await intruder.PostAsJsonAsync("/api/tutor/ask", new { message = "Coucou", conversationId });
+
+        Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        Assert.Empty(list!);
+        Assert.Equal(HttpStatusCode.NotFound, write.StatusCode);
+        var ownerView = await owner.GetFromJsonAsync<ConversationBody>($"/api/conversations/{conversationId}");
+        Assert.Equal(2, ownerView!.Messages.Count);
     }
 
     [Fact]
@@ -230,4 +321,10 @@ public class TutorEndpointTests
     }
 
     private sealed record ErrorBody(string Code, string Message);
+
+    private sealed record SummaryBody(Guid Id, Guid? NotionId, string Preview, int MessageCount);
+
+    private sealed record MessageBody(string Role, string Content);
+
+    private sealed record ConversationBody(Guid Id, List<MessageBody> Messages);
 }
