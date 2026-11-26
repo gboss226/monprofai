@@ -49,7 +49,7 @@ public class TutorController : ControllerBase
             return;
         }
 
-        var query = new AskTutorQuery(userId, request.Message ?? string.Empty, request.History);
+        var query = new AskTutorQuery(userId, request.Message ?? string.Empty, request.History, request.NotionId);
         var validation = await _validator.ValidateAsync(query, cancellationToken);
         if (!validation.IsValid)
         {
@@ -122,4 +122,4 @@ public class TutorController : ControllerBase
     }
 }
 
-public record AskTutorRequest(string? Message, List<TutorTurn>? History);
+public record AskTutorRequest(string? Message, List<TutorTurn>? History, Guid? NotionId = null);

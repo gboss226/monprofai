@@ -61,6 +61,14 @@ export function Dashboard() {
           </div>
         )}
 
+        <Link
+          to="/tutor"
+          className="block bg-blue-600 text-white rounded-lg shadow p-6 mb-6 hover:bg-blue-700 transition"
+        >
+          <h2 className="text-xl font-semibold mb-1">Travailler avec mon prof IA</h2>
+          <p className="text-blue-100">Choisis une notion et pose tes questions, à ton rythme.</p>
+        </Link>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Mes cours</h2>

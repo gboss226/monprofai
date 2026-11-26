@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using MonProfAI.Application.Interfaces;
+using MonProfAI.Domain.Entities;
 using MonProfAI.Infrastructure.Services;
 using Xunit;
 
@@ -57,6 +58,8 @@ public class TutorEndpointTests
     {
         var fake = new FakeChatService();
         var profiles = new Mock<ILearnerProfileRepository>();
+        var notions = new Mock<INotionRepository>();
+        notions.Setup(r => r.GetByIdAsync(KnownNotion.Id, It.IsAny<CancellationToken>())).ReturnsAsync(KnownNotion);
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -66,6 +69,7 @@ public class TutorEndpointTests
             {
                 services.AddSingleton<IAiChatService>(fake);
                 services.AddScoped(_ => profiles.Object);
+                services.AddScoped(_ => notions.Object);
             });
         });
         return (factory, fake);
@@ -178,6 +182,49 @@ public class TutorEndpointTests
         // Another student is not affected.
         var otherStudent = await AuthenticatedClient(factory);
         Assert.Equal(HttpStatusCode.OK, (await Ask(otherStudent)).StatusCode);
+    }
+
+    private static readonly Notion KnownNotion = new()
+    {
+        Id = Guid.NewGuid(),
+        Title = "Calculer une longueur avec le théorème de Pythagore",
+        Order = 1,
+        Chapter = new Chapter
+        {
+            Title = "Théorème de Pythagore",
+            SchoolLevel = SchoolLevel.Quatrieme,
+            Order = 7,
+            Subject = new Subject { Code = "maths", Name = "Mathématiques" },
+        },
+    };
+
+    [Fact]
+    public async Task Ask_WithANotion_FocusesTheTutorOnIt()
+    {
+        var (factory, fake) = CreateApi();
+        using var _ = factory;
+        var client = await AuthenticatedClient(factory);
+
+        var response = await client.PostAsJsonAsync("/api/tutor/ask",
+            new { message = "Je ne comprends pas", notionId = KnownNotion.Id });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("« Calculer une longueur avec le théorème de Pythagore »", fake.LastRequest!.SystemPrompt);
+        Assert.Contains("4ème", fake.LastRequest.SystemPrompt);
+    }
+
+    [Fact]
+    public async Task Ask_WithAnUnknownNotion_Returns400()
+    {
+        var (factory, fake) = CreateApi();
+        using var _ = factory;
+        var client = await AuthenticatedClient(factory);
+
+        var response = await client.PostAsJsonAsync("/api/tutor/ask",
+            new { message = "Bonjour", notionId = Guid.NewGuid() });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(fake.LastRequest);
     }
 
     private sealed record ErrorBody(string Code, string Message);
