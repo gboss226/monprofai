@@ -1,5 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
 import { getConversation } from '../api/conversations'
 import { findNotion, getReferential } from '../api/notions'
@@ -27,6 +27,7 @@ let nextId = 1
 export function TutorChat() {
   const params = useParams<{ notionId?: string; conversationId?: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [conversationId, setConversationId] = useState<string | null>(params.conversationId ?? null)
   // Avoids reloading the conversation this page just created when the URL switches to it.
@@ -153,6 +154,16 @@ export function TutorChat() {
       inputRef.current?.focus()
     }
   }
+
+  // Coming from an exercise: its statement is sent as the first question, once.
+  const initialMessage = (location.state as { initialMessage?: string } | null)?.initialMessage
+  const initialSent = useRef(false)
+  useEffect(() => {
+    if (!initialMessage || initialSent.current || !ready || messages.length > 0) return
+    initialSent.current = true
+    send(initialMessage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage, ready])
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()

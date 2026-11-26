@@ -61,13 +61,22 @@ export function Dashboard() {
           </div>
         )}
 
-        <Link
-          to="/tutor"
-          className="block bg-blue-600 text-white rounded-lg shadow p-6 mb-6 hover:bg-blue-700 transition"
-        >
-          <h2 className="text-xl font-semibold mb-1">Travailler avec mon prof IA</h2>
-          <p className="text-blue-100">Choisis une notion et pose tes questions, à ton rythme.</p>
-        </Link>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <Link
+            to="/tutor"
+            className="block bg-blue-600 text-white rounded-lg shadow p-6 hover:bg-blue-700 transition"
+          >
+            <h2 className="text-xl font-semibold mb-1">Travailler avec mon prof IA</h2>
+            <p className="text-blue-100">Choisis une notion et pose tes questions, à ton rythme.</p>
+          </Link>
+          <Link
+            to="/exercises/new"
+            className="block bg-white border-2 border-blue-600 text-blue-900 rounded-lg shadow p-6 hover:bg-blue-50 transition"
+          >
+            <h2 className="text-xl font-semibold mb-1">J'ai un exercice</h2>
+            <p className="text-blue-800">Colle ton énoncé : ton prof IA t'aide à le résoudre étape par étape.</p>
+          </Link>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white rounded-lg shadow p-6">

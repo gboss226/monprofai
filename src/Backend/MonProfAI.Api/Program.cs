@@ -43,6 +43,9 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ILearnerProfileRepository, LearnerProfileRepository>();
 builder.Services.AddScoped<INotionRepository, NotionRepository>();
 builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
+builder.Services.AddScoped<IExerciseRepository, ExerciseRepository>();
+builder.Services.AddScoped<MonProfAI.Application.UseCases.Exercises.INotionDetector,
+    MonProfAI.Application.UseCases.Exercises.AiNotionDetector>();
 builder.Services.AddScoped<DevDataSeeder>();
 builder.Services.AddAiTutor(builder.Configuration, builder.Environment.ContentRootPath);
 

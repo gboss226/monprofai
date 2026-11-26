@@ -9,6 +9,10 @@ import { TutorPicker } from './pages/TutorPicker'
 
 // Loaded on demand: Markdown + KaTeX weigh more than the rest of the app.
 const TutorChat = lazy(() => import('./pages/TutorChat').then((m) => ({ default: m.TutorChat })))
+const ExerciseNew = lazy(() => import('./pages/ExerciseNew').then((m) => ({ default: m.ExerciseNew })))
+const ExerciseSolve = lazy(() => import('./pages/ExerciseSolve').then((m) => ({ default: m.ExerciseSolve })))
+
+const loading = <p className="p-6 text-gray-500">Chargement…</p>
 
 function App() {
   return (
@@ -54,6 +58,26 @@ function App() {
             }
           />
         ))}
+        <Route
+          path="/exercises/new"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={loading}>
+                <ExerciseNew />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/exercises/:exerciseId"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={loading}>
+                <ExerciseSolve />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>

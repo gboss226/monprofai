@@ -216,6 +216,13 @@ Chaque erreur contient un `message` en français à afficher tel quel à l'élè
 | `TimeoutSeconds` | `60` | Délai maximal d'un appel |
 | `RateLimit:PermitLimit` / `RateLimit:WindowMinutes` | `30` / `60` | Nombre de questions par élève et par fenêtre de temps |
 
+### Exercices
+
+Depuis le tableau de bord, **J'ai un exercice** ouvre `/exercises/new`. L'élève y colle ou tape son énoncé (texte, formules en LaTeX entre `$...$`), avec un aperçu des formules, et peut indiquer la notion concernée. S'il ne la connaît pas, le backend demande au modèle de la choisir parmi les notions du référentiel ; si le modèle n'en trouve aucune (ou n'est pas joignable), rien n'est enregistré et l'élève est invité à la choisir lui-même. L'élève arrive ensuite sur l'écran de résolution `/exercises/:id`, qui affiche l'énoncé et la notion et ouvre une séance avec le tuteur sur cet exercice.
+
+- `POST /api/exercises` (authentifiée), corps `{ "statement": "...", "notionId": "..." }` (`notionId` facultatif) : `201` avec `{ id, notionId, notionDetected }`, `400` si l'énoncé est vide (ou dépasse 4000 caractères) ou la notion inconnue, `422` (`code: "NotionNotDetected"`) si aucune notion n'a été trouvée. Partage la limite de requêtes du tuteur, puisque la détection appelle le modèle.
+- `GET /api/exercises/{id}` (authentifiée) : un de mes exercices, avec sa notion. `404` pour celui d'un autre élève.
+
 ### Le prompt du tuteur
 
 Les consignes pédagogiques du tuteur sont dans [`TutorSystemPrompt.md`](src/Backend/MonProfAI.Application/UseCases/Tutor/TutorSystemPrompt.md), un fichier à part qu'on peut modifier sans toucher au code (il est intégré à la compilation : relance l'API après une modification). Il décrit :
@@ -335,6 +342,7 @@ erDiagram
 | `NotionMasteries` | Maîtrise d'une notion par un élève | Unicité (`UserId`, `NotionId`) |
 | `Conversations` | Séance d'un élève avec le tuteur, sur une notion ou libre | Supprimée avec l'élève (`CASCADE`), notion protégée (`RESTRICT`) |
 | `Messages` | Message d'une conversation (rôle `0` = élève, `1` = tuteur) | Supprimé avec la conversation (`CASCADE`) |
+| `Exercises` | Énoncé saisi par un élève, rattaché à une notion (statut `0` = à résoudre, `1` = en cours, `2` = résolu) | Supprimé avec l'élève (`CASCADE`), notion protégée (`RESTRICT`), énoncé ≤ 4000 caractères |
 
 **Règles de suppression** : le référentiel est protégé. On ne peut pas supprimer une matière qui a des chapitres, un chapitre qui a des notions, une notion encore requise par une autre ou une notion déjà travaillée par un élève (`RESTRICT`). Supprimer une notion supprime seulement ses propres liens de prérequis (`CASCADE`).
 
