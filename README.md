@@ -161,9 +161,15 @@ Le backend appelle un modèle d'IA (aujourd'hui **Claude, d'Anthropic**) pour r�
 
 La clé reste sur le serveur : elle n'est jamais renvoyée au navigateur. Ne la préfixe surtout pas par `VITE_`, sinon Vite l'intégrerait au code du frontend. Sans clé, l'API démarre quand même et la route répond `503` avec un message clair.
 
-### Route
+### Interface
 
-`POST /api/tutor/ask` (authentifiée), corps : `{ "message": "...", "history": [{ "role": "user" | "assistant", "content": "..." }] }`.
+Depuis le tableau de bord, **Travailler avec mon prof IA** ouvre `/tutor`. L'élève y choisit une notion, chapitre par chapitre (sa classe est présélectionnée), puis discute avec le tuteur sur `/tutor/:notionId`. Les réponses s'affichent au fur et à mesure, en Markdown, et les formules mathématiques sont rendues avec KaTeX.
+
+### Routes
+
+`GET /api/notions` (authentifiée) : matières → chapitres → notions, triés pour l'affichage.
+
+`POST /api/tutor/ask` (authentifiée), corps : `{ "message": "...", "notionId": "...", "history": [{ "role": "user" | "assistant", "content": "..." }] }`. `notionId` est facultatif : quand il est fourni, le tuteur reste centré sur cette notion.
 
 La réponse arrive en streaming (Server-Sent Events) :
 

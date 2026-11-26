@@ -1,4 +1,5 @@
 using FluentValidation;
+using MonProfAI.Application.Interfaces;
 
 namespace MonProfAI.Application.UseCases.Tutor;
 
@@ -8,8 +9,12 @@ public class AskTutorQueryValidator : AbstractValidator<AskTutorQuery>
     public const int MaxMessageLength = 2000;
     public const int MaxHistoryTurns = 20;
 
-    public AskTutorQueryValidator()
+    public AskTutorQueryValidator(INotionRepository notionRepository)
     {
+        RuleFor(x => x.NotionId)
+            .MustAsync(async (id, ct) => id is null || await notionRepository.GetByIdAsync(id.Value, ct) is not null)
+            .WithMessage("Cette notion n'existe pas");
+
         RuleFor(x => x.Message)
             .NotEmpty().WithMessage("La question est vide")
             .MaximumLength(MaxMessageLength)

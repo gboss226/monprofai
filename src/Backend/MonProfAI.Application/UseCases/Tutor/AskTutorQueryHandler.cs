@@ -9,30 +9,38 @@ public class AskTutorQueryHandler : IStreamRequestHandler<AskTutorQuery, string>
 {
     private readonly IAiChatService _aiChatService;
     private readonly ILearnerProfileRepository _learnerProfileRepository;
+    private readonly INotionRepository _notionRepository;
 
-    public AskTutorQueryHandler(IAiChatService aiChatService, ILearnerProfileRepository learnerProfileRepository)
+    public AskTutorQueryHandler(
+        IAiChatService aiChatService,
+        ILearnerProfileRepository learnerProfileRepository,
+        INotionRepository notionRepository)
     {
         _aiChatService = aiChatService;
         _learnerProfileRepository = learnerProfileRepository;
+        _notionRepository = notionRepository;
     }
 
     public async IAsyncEnumerable<string> Handle(
         AskTutorQuery request, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var profile = await _learnerProfileRepository.GetByUserIdAsync(request.UserId);
+        var notion = request.NotionId is { } notionId
+            ? await _notionRepository.GetByIdAsync(notionId, cancellationToken)
+            : null;
 
         var messages = (request.History ?? Array.Empty<TutorTurn>())
             .Select(t => new AiChatMessage(t.Role == "assistant" ? AiChatRole.Assistant : AiChatRole.User, t.Content))
             .Append(new AiChatMessage(AiChatRole.User, request.Message))
             .ToList();
 
-        var chatRequest = new AiChatRequest(BuildSystemPrompt(profile), messages);
+        var chatRequest = new AiChatRequest(BuildSystemPrompt(profile, notion), messages);
 
         await foreach (var chunk in _aiChatService.StreamReplyAsync(chatRequest, cancellationToken))
             yield return chunk;
     }
 
-    public static string BuildSystemPrompt(Domain.Entities.LearnerProfile? profile)
+    public static string BuildSystemPrompt(Domain.Entities.LearnerProfile? profile, Notion? notion = null)
     {
         var prompt =
             "Tu es MonProfAI, un professeur particulier bienveillant pour des élèves du collège et du lycée en France. " +
@@ -40,7 +48,19 @@ public class AskTutorQueryHandler : IStreamRequestHandler<AskTutorQuery, string>
             "Aide l'élève à comprendre et à raisonner par lui-même : explique la méthode, donne des indices " +
             "et pose des questions plutôt que de livrer directement la réponse d'un exercice. " +
             "Si la question n'a rien à voir avec les études, ramène gentiment la conversation vers le travail scolaire. " +
-            "Ne demande jamais d'informations personnelles à l'élève.";
+            "Ne demande jamais d'informations personnelles à l'élève. " +
+            // The chat renders Markdown and KaTeX: only these delimiters are recognised.
+            "Mets en forme tes réponses en Markdown, sans titres. Écris toute expression mathématique en LaTeX, " +
+            "entre $...$ dans le texte et entre $$...$$ pour une formule sur sa propre ligne.";
+
+        if (notion is not null)
+        {
+            prompt += $" La séance porte sur la notion « {notion.Title} » du chapitre « {notion.Chapter.Title} » " +
+                      $"({notion.Chapter.Subject.Name}, {LevelLabel(notion.Chapter.SchoolLevel)}).";
+            if (!string.IsNullOrWhiteSpace(notion.ShortDescription))
+                prompt += $" Contenu de la notion : {notion.ShortDescription}";
+            prompt += " Reste centré sur cette notion ; si l'élève s'en éloigne, aide-le brièvement puis ramène-le à la notion.";
+        }
 
         if (profile is { OnboardingCompleted: true })
         {

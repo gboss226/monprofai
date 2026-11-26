@@ -38,6 +38,7 @@ builder.Services.AddScoped<IAuthService>(sp =>
     new AuthService(jwtSecret, jwtIssuer, jwtAudience));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ILearnerProfileRepository, LearnerProfileRepository>();
+builder.Services.AddScoped<INotionRepository, NotionRepository>();
 builder.Services.AddScoped<DevDataSeeder>();
 builder.Services.AddAiTutor(builder.Configuration, builder.Environment.ContentRootPath);
 
