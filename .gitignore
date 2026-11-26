@@ -6,3 +6,6 @@ riderModule.iml
 # Frontend
 node_modules/
 dist/
+
+# Local secrets (AI_API_KEY...). Copy .env.example to .env and fill it in.
+.env

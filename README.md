@@ -149,6 +149,59 @@ API Layer (REST Controllers)
 - **Access Token** - Valide 1 heure
 - **Refresh Token** - Valide 7 jours
 
+## 🤖 Professeur IA
+
+Le backend appelle un modèle d'IA (aujourd'hui **Claude, d'Anthropic**) pour répondre aux questions des élèves.
+
+### Configurer la clé
+
+1. Copie `.env.example` en `.env` à la racine (le fichier `.env` est ignoré par git).
+2. Renseigne `AI_API_KEY=` avec ta clé Anthropic (console.anthropic.com).
+3. Relance l'API. Docker Compose transmet la variable au conteneur, et `dotnet run` la lit directement dans `.env`.
+
+La clé reste sur le serveur : elle n'est jamais renvoyée au navigateur. Ne la préfixe surtout pas par `VITE_`, sinon Vite l'intégrerait au code du frontend. Sans clé, l'API démarre quand même et la route répond `503` avec un message clair.
+
+### Route
+
+`POST /api/tutor/ask` (authentifiée), corps : `{ "message": "...", "history": [{ "role": "user" | "assistant", "content": "..." }] }`.
+
+La réponse arrive en streaming (Server-Sent Events) :
+
+```
+data: {"text":"Une fraction "}
+
+data: {"text":"représente un partage..."}
+
+event: done
+data: {}
+```
+
+| Situation | Réponse |
+|-----------|---------|
+| Pas connecté | `401` |
+| Question vide ou trop longue (> 2000 caractères) | `400` |
+| Limite par élève atteinte | `429`, `code: "RateLimited"` |
+| Clé absente ou invalide, quota du fournisseur dépassé, fournisseur indisponible | `503` |
+| Fournisseur trop lent | `504`, `code: "Timeout"` |
+| Réponse illisible ou vide | `502`, `code: "InvalidResponse"` |
+| Le modèle refuse de répondre | `422`, `code: "Refused"` |
+| Erreur après le début de la réponse | `event: error` dans le flux |
+
+Chaque erreur contient un `message` en français à afficher tel quel à l'élève.
+
+### Réglages (`appsettings.json`, section `Ai`)
+
+| Clé | Défaut | Rôle |
+|-----|--------|------|
+| `Model` | `claude-opus-5-5` | Modèle utilisé |
+| `MaxTokens` | `8000` | Longueur maximale d'une réponse (plafonne aussi son coût) |
+| `TimeoutSeconds` | `60` | Délai maximal d'un appel |
+| `RateLimit:PermitLimit` / `RateLimit:WindowMinutes` | `30` / `60` | Nombre de questions par élève et par fenêtre de temps |
+
+### Changer de fournisseur
+
+Tout le code passe par l'interface `IAiChatService` (`MonProfAI.Application`). Pour changer de fournisseur, il suffit d'écrire une autre implémentation à côté de `AnthropicChatService` (`MonProfAI.Infrastructure/Ai`) et de l'ajouter dans `AiSetup` (`MonProfAI.Api/Ai`) sous un nouveau nom de `Provider`.
+
 ## 📦 Dépendances principales
 
 ### Backend
