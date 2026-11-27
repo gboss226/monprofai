@@ -89,7 +89,15 @@ public class UnlockHintCommandHandler : ExerciseAiHandlerBase, IRequestHandler<U
         };
         var status = exercise.Status == ExerciseStatus.Solved ? ExerciseStatus.Solved : ExerciseStatus.InProgress;
         if (await Exercises.AddHintAsync(hint, status, cancellationToken))
+        {
+            // Reading the solution before succeeding ends the exercise as a failure.
+            if (request.Level == HintLevels.Solution && exercise.Status != ExerciseStatus.Solved)
+            {
+                await ExerciseCompletion.FinishAsync(Exercises, exercise, succeeded: false,
+                    hintsUsed: exercise.Hints.Count + 1, attempts: exercise.Attempts.Count, cancellationToken);
+            }
             return ToDto(hint);
+        }
 
         // Unlocked by a concurrent request: show the saved one so both tabs agree.
         var reloaded = await LoadAsync(request.ExerciseId, request.UserId, cancellationToken);
@@ -140,6 +148,13 @@ public class SubmitAnswerCommandHandler : ExerciseAiHandlerBase, IRequestHandler
         };
         var status = isCorrect || exercise.Status == ExerciseStatus.Solved ? ExerciseStatus.Solved : ExerciseStatus.InProgress;
         await Exercises.AddAttemptAsync(attempt, status, cancellationToken);
+
+        // The first right answer ends the exercise as a success (unless the solution was read before).
+        if (isCorrect)
+        {
+            await ExerciseCompletion.FinishAsync(Exercises, exercise, succeeded: true,
+                hintsUsed: exercise.Hints.Count, attempts: exercise.Attempts.Count + 1, cancellationToken);
+        }
 
         return new AttemptDto(attempt.Id, attempt.Answer, attempt.IsCorrect, attempt.Feedback, attempt.CreatedAt);
     }

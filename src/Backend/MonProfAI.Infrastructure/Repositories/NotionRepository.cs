@@ -44,4 +44,13 @@ public class NotionRepository : INotionRepository
             .Where(m => m.UserId == userId && notionIds.Contains(m.NotionId))
             .ToDictionaryAsync(m => m.NotionId, cancellationToken);
     }
+
+    public async Task<IReadOnlyList<NotionMastery>> GetAllMasteriesAsync(
+        Guid userId, CancellationToken cancellationToken = default)
+    {
+        return await _context.NotionMasteries
+            .AsNoTracking()
+            .Where(m => m.UserId == userId)
+            .ToListAsync(cancellationToken);
+    }
 }

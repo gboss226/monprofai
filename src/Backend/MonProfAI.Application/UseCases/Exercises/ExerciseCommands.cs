@@ -96,7 +96,17 @@ public sealed record ExerciseDto(
     IReadOnlyList<HintDto> Hints,
     IReadOnlyList<AttemptDto> Attempts,
     int? NextHintLevel,
-    string? SolutionLockedReason);
+    string? SolutionLockedReason,
+    ExerciseResultDto? Result);
+
+/// <summary>How a finished exercise went and how it moved the notion's mastery (scores from 0 to 1).</summary>
+public sealed record ExerciseResultDto(
+    bool Succeeded, int HintsUsed, int Attempts, double MasteryBefore, double MasteryAfter, DateTime CompletedAt)
+{
+    public static ExerciseResultDto? From(ExerciseResult? result) => result is null
+        ? null
+        : new(result.Succeeded, result.HintsUsed, result.Attempts, result.MasteryBefore, result.MasteryAfter, result.CompletedAt);
+}
 
 /// <param name="SchoolLevel">Enum name, e.g. "Quatrieme".</param>
 public sealed record ExerciseNotionDto(Guid Id, string Title, string ChapterTitle, string SchoolLevel, string SubjectName);
@@ -129,6 +139,7 @@ public class GetExerciseQueryHandler : IRequestHandler<GetExerciseQuery, Exercis
             exercise.Attempts.OrderBy(a => a.CreatedAt)
                 .Select(a => new AttemptDto(a.Id, a.Answer, a.IsCorrect, a.Feedback, a.CreatedAt)).ToList(),
             HintRules.NextLevel(exercise),
-            HintRules.CanUnlock(exercise, HintLevels.Solution).Reason);
+            HintRules.CanUnlock(exercise, HintLevels.Solution).Reason,
+            ExerciseResultDto.From(exercise.Result));
     }
 }

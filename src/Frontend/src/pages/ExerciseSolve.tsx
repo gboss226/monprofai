@@ -4,6 +4,7 @@ import { isAxiosError } from 'axios'
 import { getExercise } from '../api/exercises'
 import { ExerciseAnswer } from '../components/ExerciseAnswer'
 import { ExerciseHints } from '../components/ExerciseHints'
+import { ExerciseResultBanner } from '../components/ExerciseResultBanner'
 import { MathMarkdown } from '../components/MathMarkdown'
 import { Exercise, STATUS_LABELS } from '../types/exercise'
 import { SCHOOL_LEVELS } from '../types/learnerProfile'
@@ -99,6 +100,8 @@ export function ExerciseSolve() {
                 <MathMarkdown content={exercise.statement} />
               </div>
             </section>
+
+            <ExerciseResultBanner exercise={exercise} />
 
             <ExerciseAnswer exercise={exercise} onAnswered={reload} />
 

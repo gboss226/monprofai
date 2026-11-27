@@ -11,6 +11,7 @@ import { TutorPicker } from './pages/TutorPicker'
 const TutorChat = lazy(() => import('./pages/TutorChat').then((m) => ({ default: m.TutorChat })))
 const ExerciseNew = lazy(() => import('./pages/ExerciseNew').then((m) => ({ default: m.ExerciseNew })))
 const ExerciseSolve = lazy(() => import('./pages/ExerciseSolve').then((m) => ({ default: m.ExerciseSolve })))
+const Progress = lazy(() => import('./pages/Progress').then((m) => ({ default: m.Progress })))
 
 const loading = <p className="p-6 text-gray-500">Chargement…</p>
 
@@ -74,6 +75,16 @@ function App() {
             <ProtectedRoute>
               <Suspense fallback={loading}>
                 <ExerciseSolve />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/progress"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={loading}>
+                <Progress />
               </Suspense>
             </ProtectedRoute>
           }
