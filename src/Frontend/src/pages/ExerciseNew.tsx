@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { createExercise, ExerciseError } from '../api/exercises'
 import { getMyProfile } from '../api/learnerProfile'
 import { getReferential } from '../api/notions'
+import { ExercisePhoto } from '../components/ExercisePhoto'
 import { MathMarkdown } from '../components/MathMarkdown'
 import { useAuthStore } from '../store/authStore'
 import { MAX_STATEMENT_LENGTH } from '../types/exercise'
@@ -28,6 +29,7 @@ export function ExerciseNew() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mustChooseNotion, setMustChooseNotion] = useState(false)
+  const [readingPhoto, setReadingPhoto] = useState(false)
   const notionSelectRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
@@ -92,9 +94,17 @@ export function ExerciseNew() {
                 L'énoncé
               </label>
               <p id="statement-help" className="text-sm text-gray-500 mb-2">
-                Colle ou tape ton exercice. Tu peux écrire les formules entre dollars, par exemple{' '}
-                <code>{'$\\frac{2}{3}$'}</code> ou <code>{'$x^2$'}</code> : l'aperçu te montre le résultat.
+                Prends ton exercice en photo, ou colle-le ou tape-le. Tu peux écrire les formules entre dollars, par
+                exemple <code>{'$\\frac{2}{3}$'}</code> ou <code>{'$x^2$'}</code> : l'aperçu te montre le résultat.
               </p>
+              <ExercisePhoto
+                onStatement={(text) => {
+                  setStatement(text)
+                  setError(null)
+                }}
+                onBusyChange={setReadingPhoto}
+                disabled={submitting}
+              />
               <textarea
                 id="statement"
                 value={statement}
@@ -103,6 +113,7 @@ export function ExerciseNew() {
                 maxLength={MAX_STATEMENT_LENGTH}
                 rows={10}
                 required
+                readOnly={readingPhoto}
                 placeholder="Exemple : Le triangle ABC est rectangle en A, avec AB = 3 cm et AC = 4 cm. Calcule BC."
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -191,7 +202,7 @@ export function ExerciseNew() {
           <div className="flex justify-end">
             <button
               type="submit"
-              disabled={!statement.trim() || submitting}
+              disabled={!statement.trim() || submitting || readingPhoto}
               className="h-11 px-6 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-40"
             >
               {submitting

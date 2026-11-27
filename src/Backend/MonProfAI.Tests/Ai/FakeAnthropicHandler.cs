@@ -15,10 +15,14 @@ public sealed class FakeAnthropicHandler : HttpMessageHandler
 
     public List<HttpRequestMessage> Requests { get; } = new();
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    /// <summary>JSON bodies of the requests, read before the SDK disposes them.</summary>
+    public List<string> Bodies { get; } = new();
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Requests.Add(request);
-        return _respond(request, cancellationToken);
+        Bodies.Add(request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken));
+        return await _respond(request, cancellationToken);
     }
 
     public static FakeAnthropicHandler Returning(HttpStatusCode status, string body, string contentType = "application/json") =>

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using MonProfAI.Api.Ai;
+using MonProfAI.Application.Interfaces;
 using MonProfAI.Application.UseCases.Exercises;
 
 namespace MonProfAI.Api.Controllers;
@@ -55,6 +56,57 @@ public class ExercisesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Reads the statement from a photo of an exercise and returns it as text, for the student to check before
+    /// saving it. Nothing is stored, the photo included.
+    /// </summary>
+    [HttpPost("transcribe")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(ImageFormat.MaxBytes + 64 * 1024)]
+    [EnableRateLimiting(AiSetup.RateLimitPolicy)]
+    public async Task<ActionResult<TranscriptionDto>> Transcribe(IFormFile? image, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out _))
+            return Unauthorized();
+
+        if (image is null || image.Length == 0)
+            return BadRequest(new { code = "InvalidRequest", message = "Ajoute une photo de ton exercice." });
+        if (image.Length > ImageFormat.MaxBytes)
+            return BadRequest(new { code = "ImageTooLarge", message = "La photo est trop lourde (5 Mo maximum)." });
+
+        byte[] bytes;
+        await using (var stream = image.OpenReadStream())
+        using (var buffer = new MemoryStream())
+        {
+            await stream.CopyToAsync(buffer, cancellationToken);
+            bytes = buffer.ToArray();
+        }
+
+        var mediaType = ImageFormat.Sniff(bytes);
+        if (mediaType is null)
+            return BadRequest(new { code = "UnsupportedImage", message = "Ce fichier n'est pas une photo (JPEG, PNG, WebP ou GIF)." });
+
+        try
+        {
+            var statement = await _mediator.Send(
+                new TranscribeExerciseCommand(new AiImage(mediaType, bytes)), cancellationToken);
+            return Ok(new TranscriptionDto(statement));
+        }
+        catch (ExerciseNotReadableException)
+        {
+            return UnprocessableEntity(new
+            {
+                code = "NotReadable",
+                message = "Je n'arrive pas à lire d'énoncé sur cette photo. Reprends-la bien à plat, nette et éclairée, ou tape l'énoncé.",
+            });
+        }
+        catch (AiServiceException ex)
+        {
+            return StatusCode(ex.Kind == AiErrorKind.Timeout ? StatusCodes.Status504GatewayTimeout : StatusCodes.Status503ServiceUnavailable,
+                new { code = ex.Kind.ToString(), message = ex.StudentMessage });
+        }
+    }
+
     /// <summary>One of my exercises. 404 if it does not exist or is someone else's.</summary>
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ExerciseDto>> Get(Guid id, CancellationToken cancellationToken)
@@ -71,6 +123,9 @@ public class ExercisesController : ControllerBase
     private bool TryGetUserId(out Guid userId) =>
         Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 }
+
+/// <param name="Statement">Text read from the photo, formulas in LaTeX. Meant to be checked by the student.</param>
+public record TranscriptionDto(string Statement);
 
 /// <param name="NotionId">Optional: the notion chosen by the student. Omit it to let the model detect it.</param>
 public record CreateExerciseRequest(string? Statement, Guid? NotionId = null);

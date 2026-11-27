@@ -28,10 +28,12 @@ public class ExerciseEndpointTests : IDisposable
     {
         public string Answer { get; set; } = "AUCUNE";
         public int Calls { get; private set; }
+        public AiChatRequest? LastRequest { get; private set; }
 
         public async IAsyncEnumerable<string> StreamReplyAsync(AiChatRequest request, CancellationToken cancellationToken = default)
         {
             Calls++;
+            LastRequest = request;
             await Task.Yield();
             yield return Answer;
         }
@@ -156,6 +158,80 @@ public class ExerciseEndpointTests : IDisposable
     {
         var response = await _factory.CreateClient().PostAsJsonAsync("/api/exercises",
             new { statement = "Calcule 2 + 2", notionId = _fractionsId });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // Smallest valid PNG header: enough for the format check, never decoded by the scripted model.
+    private static readonly byte[] PngBytes = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13 };
+
+    private static MultipartFormDataContent Photo(byte[] bytes, string contentType = "image/png")
+    {
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        return new MultipartFormDataContent { { file, "image", "photo.png" } };
+    }
+
+    private sealed record TranscriptionBody(string Statement);
+
+    [Fact]
+    public async Task Transcribe_ReturnsTheStatementReadFromThePhoto_AndStoresNothing()
+    {
+        var client = await Student();
+        _ai.Answer = "  1. Calcule $\\frac{2}{3} + \\frac{5}{4}$.  ";
+
+        var response = await client.PostAsync("/api/exercises/transcribe", Photo(PngBytes));
+        var body = await response.Content.ReadFromJsonAsync<TranscriptionBody>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("1. Calcule $\\frac{2}{3} + \\frac{5}{4}$.", body!.Statement);
+        var image = Assert.Single(_ai.LastRequest!.Messages.Single().Images!);
+        Assert.Equal("image/png", image.MediaType);
+        Assert.Equal(PngBytes, image.Data);
+        Assert.Equal(0, await ExerciseCount());
+    }
+
+    [Fact]
+    public async Task Transcribe_WhenThePhotoIsNotReadable_Returns422()
+    {
+        var client = await Student();
+        _ai.Answer = "ILLISIBLE";
+
+        var response = await client.PostAsync("/api/exercises/transcribe", Photo(PngBytes));
+        var error = await response.Content.ReadFromJsonAsync<ErrorBody>();
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("NotReadable", error!.Code);
+    }
+
+    [Fact]
+    public async Task Transcribe_RejectsAFileThatIsNotAnImage_WhateverItClaims()
+    {
+        var client = await Student();
+
+        var response = await client.PostAsync("/api/exercises/transcribe",
+            Photo("%PDF-1.7 not an image"u8.ToArray(), contentType: "image/png"));
+        var error = await response.Content.ReadFromJsonAsync<ErrorBody>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("UnsupportedImage", error!.Code);
+        Assert.Equal(0, _ai.Calls);
+    }
+
+    [Fact]
+    public async Task Transcribe_WithoutAPhoto_Returns400()
+    {
+        var client = await Student();
+
+        var response = await client.PostAsync("/api/exercises/transcribe", new MultipartFormDataContent());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Transcribe_WithoutLogin_Returns401()
+    {
+        var response = await _factory.CreateClient().PostAsync("/api/exercises/transcribe", Photo(PngBytes));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

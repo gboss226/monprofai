@@ -222,6 +222,9 @@ Depuis le tableau de bord, **J'ai un exercice** ouvre `/exercises/new`. L'élèv
 
 - `POST /api/exercises` (authentifiée), corps `{ "statement": "...", "notionId": "..." }` (`notionId` facultatif) : `201` avec `{ id, notionId, notionDetected }`, `400` si l'énoncé est vide (ou dépasse 4000 caractères) ou la notion inconnue, `422` (`code: "NotionNotDetected"`) si aucune notion n'a été trouvée. Partage la limite de requêtes du tuteur, puisque la détection appelle le modèle.
 - `GET /api/exercises/{id}` (authentifiée) : un de mes exercices, avec sa notion. `404` pour celui d'un autre élève.
+- `POST /api/exercises/transcribe` (authentifiée, `multipart/form-data`, champ `image`) : lit l'énoncé sur une photo et renvoie `{ statement }`, avec les formules en LaTeX. Rien n'est enregistré, pas même la photo : le texte revient dans le champ de saisie, où l'élève le vérifie avant de valider. JPEG, PNG, WebP ou GIF de 5 Mo maximum, le format étant vérifié d'après le contenu du fichier. `422` (`code: "NotReadable"`) si la photo ne montre pas d'énoncé lisible. Partage la limite de requêtes du tuteur.
+
+**Exercice en photo** : sur la page de saisie, « Prendre une photo » ouvre l'appareil photo sur téléphone, et « Importer une image » ouvre la galerie ou les fichiers. Avant l'envoi, le navigateur réduit l'image à 2000 px de côté au maximum et la convertit en JPEG : une photo de téléphone de plusieurs Mo pèse alors quelques dizaines de Ko, ce qui accélère l'envoi et réduit le coût de l'appel au modèle.
 
 ### Le prompt du tuteur
 
