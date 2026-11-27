@@ -23,6 +23,9 @@ public class Exercise
 
     public ICollection<ExerciseHint> Hints { get; set; } = new List<ExerciseHint>();
     public ICollection<ExerciseAttempt> Attempts { get; set; } = new List<ExerciseAttempt>();
+
+    /// <summary>Set once the exercise is over; null while the student is still working on it.</summary>
+    public ExerciseResult? Result { get; set; }
 }
 
 /// <summary>

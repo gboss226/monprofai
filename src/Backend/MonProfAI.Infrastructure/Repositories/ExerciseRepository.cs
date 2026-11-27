@@ -30,6 +30,7 @@ public class ExerciseRepository : IExerciseRepository
             .ThenInclude(c => c.Subject)
             .Include(e => e.Hints.OrderBy(h => h.Level))
             .Include(e => e.Attempts.OrderBy(a => a.CreatedAt))
+            .Include(e => e.Result)
             .AsSplitQuery()
             .FirstOrDefaultAsync(e => e.Id == exerciseId && e.UserId == userId, cancellationToken);
     }
@@ -56,6 +57,58 @@ public class ExerciseRepository : IExerciseRepository
         await SetStatusAsync(attempt.ExerciseId, status, cancellationToken);
         _context.ExerciseAttempts.Add(attempt);
         await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<double?> GetMasteryScoreAsync(Guid userId, Guid notionId, CancellationToken cancellationToken = default)
+    {
+        var mastery = await _context.NotionMasteries.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.UserId == userId && m.NotionId == notionId, cancellationToken);
+        return mastery?.MasteryScore;
+    }
+
+    public async Task<bool> SaveResultAsync(
+        ExerciseResult result, Guid userId, Guid notionId, CancellationToken cancellationToken = default)
+    {
+        if (await _context.ExerciseResults.AnyAsync(r => r.ExerciseId == result.ExerciseId, cancellationToken))
+            return false;
+
+        var mastery = await _context.NotionMasteries
+            .FirstOrDefaultAsync(m => m.UserId == userId && m.NotionId == notionId, cancellationToken);
+        if (mastery is null)
+        {
+            mastery = new NotionMastery { UserId = userId, NotionId = notionId, CreatedAt = result.CompletedAt };
+            _context.NotionMasteries.Add(mastery);
+        }
+        mastery.MasteryScore = result.MasteryAfter;
+        mastery.AttemptCount++;
+        mastery.LastActivity = result.CompletedAt;
+
+        _context.ExerciseResults.Add(result);
+        try
+        {
+            // One SaveChanges: the result and the mastery are written together or not at all.
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            // Unique ExerciseId: another request finished the same exercise meanwhile.
+            _context.ChangeTracker.Clear();
+            return false;
+        }
+    }
+
+    public async Task<IReadOnlyList<ExerciseResult>> GetRecentResultsAsync(
+        Guid userId, int count, CancellationToken cancellationToken = default)
+    {
+        return await _context.ExerciseResults
+            .AsNoTracking()
+            .Include(r => r.Exercise)
+            .ThenInclude(e => e.Notion)
+            .Where(r => r.Exercise.UserId == userId)
+            .OrderByDescending(r => r.CompletedAt)
+            .Take(count)
+            .ToListAsync(cancellationToken);
     }
 
     private async Task SetStatusAsync(Guid exerciseId, ExerciseStatus status, CancellationToken cancellationToken)

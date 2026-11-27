@@ -41,6 +41,18 @@ export interface Exercise {
   nextHintLevel: number | null
   /** Why the solution is still locked, null when it can be (or is) unlocked. */
   solutionLockedReason: string | null
+  /** Set once the exercise is over (right answer, or solution read before succeeding). */
+  result: ExerciseResult | null
+}
+
+export interface ExerciseResult {
+  succeeded: boolean
+  hintsUsed: number
+  attempts: number
+  /** Mastery of the notion before and after this exercise, from 0 to 1. */
+  masteryBefore: number
+  masteryAfter: number
+  completedAt: string
 }
 
 export const SOLUTION_LEVEL = 4

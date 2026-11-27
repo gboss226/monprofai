@@ -245,6 +245,21 @@ dotnet run --project src/Backend/MonProfAI.Api -- hint-eval
 
 Sur 3 exercices tests (fractions, Pythagore, équation), la commande vérifie que la solution est refusée d'emblée, qu'une réponse fausse est corrigée sans donner la solution, que les indices 1 à 3 ne donnent pas le résultat, que chaque indice est plus précis que le précédent et que la solution est juste. Elle écrit un rapport Markdown. Compter quelques centimes par passage.
 
+**Résultats et maîtrise** : un exercice se termine une seule fois, au premier des deux événements suivants : une bonne réponse (réussite) ou la solution complète ouverte avant d'avoir réussi (échec). À ce moment, le résultat est enregistré dans `ExerciseResults` (indices utilisés, réponses proposées, réussite, date, maîtrise avant et après), et le score de la notion est mis à jour dans `NotionMasteries`. Les réponses ou indices suivants ne changent plus rien.
+
+La règle de calcul est dans [`MasteryRule`](src/Backend/MonProfAI.Domain/Mastery/MasteryRule.cs), une fonction pure, isolée et testée (`MasteryRuleTests`). Le score (de 0 à 1, 0,3 pour une notion jamais travaillée) avance d'une fraction de la distance qui le sépare de sa cible : 1 en cas de réussite, 0 en cas d'échec.
+
+| Fin de l'exercice | Effet (score de départ 0,5) |
+|-------------------|-----------------------------|
+| Réussite sans indice, du premier coup | forte hausse : moitié du chemin vers 1 (→ 0,75) |
+| Réussite avec 1, 2, puis 3 indices ou plus | hausse de plus en plus faible (→ 0,675, 0,6, 0,55) |
+| Réponses fausses avant la bonne | hausse réduite de 10 % par erreur, au plus de moitié |
+| Échec (solution consultée) | baisse de 30 % du score (→ 0,35) |
+
+Pour changer la règle, il suffit de modifier les constantes ou la fonction `MasteryRule.Next`, puis d'adapter `MasteryRuleTests`, qui fixent son comportement.
+
+La page **Ma progression** (`/progress`, depuis le tableau de bord) montre la maîtrise de chaque notion, chapitre par chapitre (classe de l'élève présélectionnée), et les 10 derniers exercices terminés avec l'évolution de la maîtrise. Route : `GET /api/progress` (authentifiée), qui renvoie seulement les données de l'élève connecté.
+
 **Exercice en photo** : sur la page de saisie, « Prendre une photo » ouvre l'appareil photo sur téléphone, et « Importer une image » ouvre la galerie ou les fichiers. Avant l'envoi, le navigateur réduit l'image à 2000 px de côté au maximum et la convertit en JPEG : une photo de téléphone de plusieurs Mo pèse alors quelques dizaines de Ko, ce qui accélère l'envoi et réduit le coût de l'appel au modèle.
 
 ### Le prompt du tuteur
@@ -369,6 +384,7 @@ erDiagram
 | `Exercises` | Énoncé saisi par un élève, rattaché à une notion (statut `0` = à résoudre, `1` = en cours, `2` = résolu) | Supprimé avec l'élève (`CASCADE`), notion protégée (`RESTRICT`), énoncé ≤ 4000 caractères |
 | `ExerciseHints` | Indice débloqué (niveau 1 à 4) | Unicité (`ExerciseId`, `Level`), niveau entre 1 et 4, supprimé avec l'exercice (`CASCADE`) |
 | `ExerciseAttempts` | Réponse proposée par l'élève, avec le verdict et le retour du modèle | Supprimée avec l'exercice (`CASCADE`) |
+| `ExerciseResults` | Bilan d'un exercice terminé : indices utilisés, réponses proposées, réussite, date, maîtrise avant et après | Un seul par exercice (unicité `ExerciseId`), compteurs ≥ 0, maîtrises entre 0 et 1, supprimé avec l'exercice (`CASCADE`) |
 
 **Règles de suppression** : le référentiel est protégé. On ne peut pas supprimer une matière qui a des chapitres, un chapitre qui a des notions, une notion encore requise par une autre ou une notion déjà travaillée par un élève (`RESTRICT`). Supprimer une notion supprime seulement ses propres liens de prérequis (`CASCADE`).
 

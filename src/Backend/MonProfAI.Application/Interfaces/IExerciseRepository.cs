@@ -17,4 +17,18 @@ public interface IExerciseRepository
 
     /// <summary>Saves an attempt and the exercise's new status.</summary>
     Task AddAttemptAsync(ExerciseAttempt attempt, ExerciseStatus status, CancellationToken cancellationToken = default);
+
+    /// <summary>The student's mastery score of a notion, or null if he never worked on it.</summary>
+    Task<double?> GetMasteryScoreAsync(Guid userId, Guid notionId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Saves the result of a finished exercise and sets the notion's mastery to <c>result.MasteryAfter</c>, together.
+    /// False (and nothing saved) if the exercise already had a result.
+    /// </summary>
+    Task<bool> SaveResultAsync(
+        ExerciseResult result, Guid userId, Guid notionId, CancellationToken cancellationToken = default);
+
+    /// <summary>The student's latest finished exercises, most recent first, with their notion.</summary>
+    Task<IReadOnlyList<ExerciseResult>> GetRecentResultsAsync(
+        Guid userId, int count, CancellationToken cancellationToken = default);
 }

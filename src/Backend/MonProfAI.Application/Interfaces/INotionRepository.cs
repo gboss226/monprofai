@@ -13,4 +13,7 @@ public interface INotionRepository
     /// <summary>The student's mastery of the given notions, by notion id. Notions never worked on are absent.</summary>
     Task<IReadOnlyDictionary<Guid, NotionMastery>> GetMasteriesAsync(
         Guid userId, IReadOnlyCollection<Guid> notionIds, CancellationToken cancellationToken = default);
+
+    /// <summary>Every mastery of the student (one per notion worked on).</summary>
+    Task<IReadOnlyList<NotionMastery>> GetAllMasteriesAsync(Guid userId, CancellationToken cancellationToken = default);
 }

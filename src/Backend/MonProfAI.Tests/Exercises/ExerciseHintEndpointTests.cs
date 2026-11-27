@@ -217,6 +217,108 @@ public class ExerciseHintEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, (await Answer(client, id, "  ")).StatusCode);
     }
 
+    private sealed record ResultBody(bool Succeeded, int HintsUsed, int Attempts, double MasteryBefore, double MasteryAfter);
+
+    private sealed record ExerciseWithResult(ResultBody? Result);
+
+    private sealed record MasteryBody(Guid NotionId, double Score, int ExercisesCount);
+
+    private sealed record RecentBody(Guid ExerciseId, string NotionTitle, bool Succeeded, int HintsUsed, int Attempts);
+
+    private sealed record ProgressBody(List<MasteryBody> Masteries, List<RecentBody> RecentResults);
+
+    private async Task<double> Mastery(HttpClient client) =>
+        (await client.GetFromJsonAsync<ProgressBody>("/api/progress"))!.Masteries.Single(m => m.NotionId == _notionId).Score;
+
+    [Fact]
+    public async Task SuccessWithoutHint_RaisesMasteryStrongly_AndShowsOnTheProgressPage()
+    {
+        var client = await Student();
+        var id = await NewExercise(client);
+        _ai.Verdict = "JUSTE\nBravo.";
+
+        await Answer(client, id, "BC = 5 cm");
+
+        var exercise = await client.GetFromJsonAsync<ExerciseWithResult>($"/api/exercises/{id}");
+        Assert.Equal(new ResultBody(true, 0, 1, 0.3, 0.65), exercise!.Result! with { MasteryAfter = Math.Round(exercise.Result!.MasteryAfter, 6) });
+        var progress = await client.GetFromJsonAsync<ProgressBody>("/api/progress");
+        var mastery = Assert.Single(progress!.Masteries);
+        Assert.Equal(0.65, mastery.Score, precision: 6);
+        Assert.Equal(1, mastery.ExercisesCount);
+        var recent = Assert.Single(progress.RecentResults);
+        Assert.Equal(new RecentBody(id, "Calculer une longueur avec Pythagore", true, 0, 1), recent);
+    }
+
+    [Fact]
+    public async Task ReadingTheSolutionBeforeSucceeding_IsAFailure_AndLowersMastery()
+    {
+        var client = await Student();
+        var id = await NewExercise(client);
+        for (var level = 1; level <= 4; level++)
+            await Hint(client, id, level);
+
+        var exercise = await client.GetFromJsonAsync<ExerciseWithResult>($"/api/exercises/{id}");
+
+        Assert.False(exercise!.Result!.Succeeded);
+        Assert.Equal(4, exercise.Result.HintsUsed);
+        Assert.True(await Mastery(client) < 0.3);
+    }
+
+    [Fact]
+    public async Task SuccessWithManyHints_RaisesLessThanSuccessWithout()
+    {
+        var client = await Student();
+        _ai.Verdict = "JUSTE\nBravo.";
+
+        var first = await NewExercise(client);
+        await Answer(client, first, "BC = 5 cm");
+        var afterClean = await Mastery(client);
+
+        var second = await NewExercise(client);
+        for (var level = 1; level <= 3; level++)
+            await Hint(client, second, level);
+        await Answer(client, second, "BC = 5 cm");
+        var afterHelped = await Mastery(client);
+
+        Assert.True(afterClean - 0.3 > afterHelped - afterClean);
+        Assert.True(afterHelped > afterClean);
+        var progress = await client.GetFromJsonAsync<ProgressBody>("/api/progress");
+        Assert.Equal(2, progress!.Masteries.Single().ExercisesCount);
+        Assert.Equal(new[] { second, first }, progress.RecentResults.Select(r => r.ExerciseId)); // most recent first
+    }
+
+    [Fact]
+    public async Task AFinishedExercise_MovesMasteryOnlyOnce()
+    {
+        var client = await Student();
+        var id = await NewExercise(client);
+        _ai.Verdict = "JUSTE\nBravo.";
+        await Answer(client, id, "BC = 5 cm");
+        var once = await Mastery(client);
+
+        await Answer(client, id, "BC = 5");
+        await Hint(client, id, 1);
+        await Hint(client, id, 4); // solved: the correction can be read, it is not a failure
+
+        Assert.Equal(once, await Mastery(client));
+        var progress = await client.GetFromJsonAsync<ProgressBody>("/api/progress");
+        Assert.Single(progress!.RecentResults);
+    }
+
+    [Fact]
+    public async Task Progress_ShowsOnlyTheStudentsOwnResults()
+    {
+        var owner = await Student();
+        var id = await NewExercise(owner);
+        _ai.Verdict = "JUSTE\nBravo.";
+        await Answer(owner, id, "BC = 5 cm");
+
+        var other = await (await Student()).GetFromJsonAsync<ProgressBody>("/api/progress");
+
+        Assert.Empty(other!.Masteries);
+        Assert.Empty(other.RecentResults);
+    }
+
     [Fact]
     public async Task AnotherStudent_CannotUnlockHintsOrAnswer()
     {

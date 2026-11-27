@@ -86,13 +86,11 @@ export function Dashboard() {
             </p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Progression</h2>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-600 h-2 rounded-full" style={{ width: '0%' }}></div>
-            </div>
-            <p className="text-gray-600 mt-2">0% complété</p>
-          </div>
+          <Link to="/progress" className="block bg-white rounded-lg shadow p-6 hover:shadow-md transition">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Ma progression</h2>
+            <p className="text-gray-600">Ta maîtrise de chaque notion et tes derniers exercices.</p>
+            <p className="text-blue-700 font-medium mt-2">Voir ma progression →</p>
+          </Link>
 
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Notifications</h2>

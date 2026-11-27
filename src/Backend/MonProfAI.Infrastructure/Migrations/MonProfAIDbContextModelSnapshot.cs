@@ -234,6 +234,46 @@ namespace MonProfAI.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.ExerciseResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ExerciseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("HintsUsed")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("MasteryAfter")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("MasteryBefore")
+                        .HasColumnType("double precision");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExerciseId")
+                        .IsUnique();
+
+                    b.ToTable("ExerciseResults", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExerciseResults_Counts", "\"HintsUsed\" >= 0 AND \"Attempts\" >= 0");
+
+                            t.HasCheckConstraint("CK_ExerciseResults_Mastery", "\"MasteryBefore\" BETWEEN 0 AND 1 AND \"MasteryAfter\" BETWEEN 0 AND 1");
+                        });
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.LearnerProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -579,6 +619,17 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.Navigation("Exercise");
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.ExerciseResult", b =>
+                {
+                    b.HasOne("MonProfAI.Domain.Entities.Exercise", "Exercise")
+                        .WithOne("Result")
+                        .HasForeignKey("MonProfAI.Domain.Entities.ExerciseResult", "ExerciseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Exercise");
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.LearnerProfile", b =>
                 {
                     b.HasOne("MonProfAI.Domain.Entities.User", "User")
@@ -691,6 +742,8 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.Navigation("Attempts");
 
                     b.Navigation("Hints");
+
+                    b.Navigation("Result");
                 });
 
             modelBuilder.Entity("MonProfAI.Domain.Entities.Notion", b =>

@@ -24,6 +24,7 @@ public class MonProfAIDbContext : DbContext
     public DbSet<Exercise> Exercises => Set<Exercise>();
     public DbSet<ExerciseHint> ExerciseHints => Set<ExerciseHint>();
     public DbSet<ExerciseAttempt> ExerciseAttempts => Set<ExerciseAttempt>();
+    public DbSet<ExerciseResult> ExerciseResults => Set<ExerciseResult>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -237,6 +238,22 @@ public class MonProfAIDbContext : DbContext
             entity.Property(e => e.Answer).IsRequired().HasMaxLength(HintLevels.MaxAnswerLength);
             entity.Property(e => e.Feedback).IsRequired();
             entity.HasIndex(e => new { e.ExerciseId, e.CreatedAt });
+        });
+
+        modelBuilder.Entity<ExerciseResult>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            // One result per exercise: an exercise ends once, so mastery moves once.
+            entity.HasOne(e => e.Exercise)
+                .WithOne(x => x.Result)
+                .HasForeignKey<ExerciseResult>(e => e.ExerciseId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_ExerciseResults_Counts", "\"HintsUsed\" >= 0 AND \"Attempts\" >= 0");
+                t.HasCheckConstraint("CK_ExerciseResults_Mastery",
+                    "\"MasteryBefore\" BETWEEN 0 AND 1 AND \"MasteryAfter\" BETWEEN 0 AND 1");
+            });
         });
     }
 }
