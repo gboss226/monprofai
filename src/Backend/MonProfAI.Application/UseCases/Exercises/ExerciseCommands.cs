@@ -83,13 +83,20 @@ public class CreateExerciseCommandHandler : IRequestHandler<CreateExerciseComman
 public sealed record GetExerciseQuery(Guid UserId, Guid ExerciseId) : IRequest<ExerciseDto?>;
 
 /// <param name="Status">"ToSolve", "InProgress" or "Solved".</param>
+/// <param name="Hints">Hints unlocked so far, by level.</param>
+/// <param name="NextHintLevel">Level the page offers next, null when all are unlocked.</param>
+/// <param name="SolutionLockedReason">Why the solution cannot be unlocked yet, null when it can (or already is).</param>
 public sealed record ExerciseDto(
     Guid Id,
     string Statement,
     string Status,
     bool NotionDetected,
     DateTime CreatedAt,
-    ExerciseNotionDto Notion);
+    ExerciseNotionDto Notion,
+    IReadOnlyList<HintDto> Hints,
+    IReadOnlyList<AttemptDto> Attempts,
+    int? NextHintLevel,
+    string? SolutionLockedReason);
 
 /// <param name="SchoolLevel">Enum name, e.g. "Quatrieme".</param>
 public sealed record ExerciseNotionDto(Guid Id, string Title, string ChapterTitle, string SchoolLevel, string SubjectName);
@@ -117,6 +124,11 @@ public class GetExerciseQueryHandler : IRequestHandler<GetExerciseQuery, Exercis
             exercise.NotionDetected,
             exercise.CreatedAt,
             new ExerciseNotionDto(
-                notion.Id, notion.Title, notion.Chapter.Title, notion.Chapter.SchoolLevel.ToString(), notion.Chapter.Subject.Name));
+                notion.Id, notion.Title, notion.Chapter.Title, notion.Chapter.SchoolLevel.ToString(), notion.Chapter.Subject.Name),
+            exercise.Hints.OrderBy(h => h.Level).Select(UnlockHintCommandHandler.ToDto).ToList(),
+            exercise.Attempts.OrderBy(a => a.CreatedAt)
+                .Select(a => new AttemptDto(a.Id, a.Answer, a.IsCorrect, a.Feedback, a.CreatedAt)).ToList(),
+            HintRules.NextLevel(exercise),
+            HintRules.CanUnlock(exercise, HintLevels.Solution).Reason);
     }
 }

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { isAxiosError } from 'axios'
 import { getExercise } from '../api/exercises'
+import { ExerciseAnswer } from '../components/ExerciseAnswer'
+import { ExerciseHints } from '../components/ExerciseHints'
 import { MathMarkdown } from '../components/MathMarkdown'
 import { Exercise, STATUS_LABELS } from '../types/exercise'
 import { SCHOOL_LEVELS } from '../types/learnerProfile'
@@ -25,6 +27,11 @@ export function ExerciseSolve() {
         )
       )
   }, [exerciseId])
+
+  // After a hint or an answer, reload: the server recomputes the status and what can be unlocked next.
+  const reload = () => {
+    if (exerciseId) getExercise(exerciseId).then(setExercise).catch(() => {})
+  }
 
   const startWithTutor = () => {
     if (!exercise) return
@@ -93,16 +100,21 @@ export function ExerciseSolve() {
               </div>
             </section>
 
-            <section className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h2 className="font-semibold text-blue-900 mb-1">Résoudre avec ton prof IA</h2>
-              <p className="text-sm text-blue-900 mb-3">
-                Il ne te donnera pas la réponse : il t'aide à trouver chaque étape toi-même.
+            <ExerciseAnswer exercise={exercise} onAnswered={reload} />
+
+            <ExerciseHints exercise={exercise} onUnlocked={reload} />
+
+            <section className="rounded-lg border border-gray-200 p-4">
+              <h2 className="font-semibold text-gray-900 mb-1">Besoin d'en parler ?</h2>
+              <p className="text-sm text-gray-600 mb-3">
+                Discute de l'exercice avec ton prof IA : il t'aide à trouver chaque étape toi-même, sans te donner la
+                réponse.
               </p>
               <button
                 onClick={startWithTutor}
-                className="h-11 px-5 rounded-full bg-blue-600 text-white font-medium hover:bg-blue-700"
+                className="h-10 px-4 rounded-full border border-blue-600 text-blue-700 text-sm font-medium hover:bg-blue-50"
               >
-                Commencer la résolution
+                Discuter avec mon prof IA
               </button>
             </section>
           </>

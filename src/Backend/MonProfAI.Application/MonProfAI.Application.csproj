@@ -13,6 +13,8 @@
     <ItemGroup>
         <!-- The tutor's system prompt, kept in its own file so it can be edited without touching code. -->
         <EmbeddedResource Include="UseCases\Tutor\TutorSystemPrompt.md" />
+        <!-- Exercise hints and answer checking, same principle. -->
+        <EmbeddedResource Include="UseCases\Exercises\Prompts\*.md" />
     </ItemGroup>
 
     <ItemGroup>

@@ -22,6 +22,8 @@ public class MonProfAIDbContext : DbContext
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ConversationMessage> Messages => Set<ConversationMessage>();
     public DbSet<Exercise> Exercises => Set<Exercise>();
+    public DbSet<ExerciseHint> ExerciseHints => Set<ExerciseHint>();
+    public DbSet<ExerciseAttempt> ExerciseAttempts => Set<ExerciseAttempt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -209,6 +211,32 @@ public class MonProfAIDbContext : DbContext
             entity.Property(e => e.Statement).IsRequired().HasMaxLength(ExerciseLimits.MaxStatementLength);
             entity.Property(e => e.Status).IsRequired();
             entity.HasIndex(e => new { e.UserId, e.CreatedAt });
+        });
+
+        modelBuilder.Entity<ExerciseHint>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Exercise)
+                .WithMany(x => x.Hints)
+                .HasForeignKey(e => e.ExerciseId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.Content).IsRequired();
+            // One hint per level: unlocking twice (double click, two tabs) cannot create duplicates.
+            entity.HasIndex(e => new { e.ExerciseId, e.Level }).IsUnique();
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_ExerciseHints_Level", $"\"Level\" BETWEEN 1 AND {HintLevels.Solution}"));
+        });
+
+        modelBuilder.Entity<ExerciseAttempt>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Exercise)
+                .WithMany(x => x.Attempts)
+                .HasForeignKey(e => e.ExerciseId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.Answer).IsRequired().HasMaxLength(HintLevels.MaxAnswerLength);
+            entity.Property(e => e.Feedback).IsRequired();
+            entity.HasIndex(e => new { e.ExerciseId, e.CreatedAt });
         });
     }
 }
