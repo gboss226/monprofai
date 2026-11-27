@@ -224,6 +224,27 @@ Depuis le tableau de bord, **J'ai un exercice** ouvre `/exercises/new`. L'élèv
 - `GET /api/exercises/{id}` (authentifiée) : un de mes exercices, avec sa notion. `404` pour celui d'un autre élève.
 - `POST /api/exercises/transcribe` (authentifiée, `multipart/form-data`, champ `image`) : lit l'énoncé sur une photo et renvoie `{ statement }`, avec les formules en LaTeX. Rien n'est enregistré, pas même la photo : le texte revient dans le champ de saisie, où l'élève le vérifie avant de valider. JPEG, PNG, WebP ou GIF de 5 Mo maximum, le format étant vérifié d'après le contenu du fichier. `422` (`code: "NotReadable"`) si la photo ne montre pas d'énoncé lisible. Partage la limite de requêtes du tuteur.
 
+**Indices et réponses** : sur l'écran de résolution, l'élève peut proposer sa réponse à tout moment ; le modèle dit si elle est juste et, sinon, où est l'erreur, sans donner la solution. Il peut aussi débloquer des indices, un par un et dans l'ordre :
+
+1. rappel de la notion utile ;
+2. méthode à appliquer ;
+3. première étape ;
+4. solution complète expliquée, disponible seulement après les 3 premiers indices, après 3 réponses fausses, ou une fois l'exercice résolu.
+
+Ces règles sont appliquées par le serveur, pas seulement par la page. Les indices déjà débloqués restent affichés, et chaque indice est généré une seule fois puis enregistré. Les prompts sont dans des fichiers à part, modifiables sans toucher au code : [`ExerciseHintPrompt.md`](src/Backend/MonProfAI.Application/UseCases/Exercises/Prompts/ExerciseHintPrompt.md) (consignes communes et une section `[[NIVEAU n]]` par indice) et [`AnswerCheckPrompt.md`](src/Backend/MonProfAI.Application/UseCases/Exercises/Prompts/AnswerCheckPrompt.md) (sa première ligne doit rester `JUSTE` ou `FAUX`).
+
+- `POST /api/exercises/{id}/hints` `{ "level": 1-4 }` : `200` avec l'indice, `409` (`code: "HintLocked"`) si ce niveau n'est pas encore accessible.
+- `POST /api/exercises/{id}/attempts` `{ "answer": "..." }` : `200` avec `{ isCorrect, feedback }`. Une réponse juste passe l'exercice en « résolu ».
+- `GET /api/exercises/{id}` renvoie aussi les indices débloqués, les réponses proposées, le prochain niveau (`nextHintLevel`) et, si la solution est encore verrouillée, la raison (`solutionLockedReason`).
+
+Pour vérifier les indices avec le vrai modèle après une modification des prompts (clé dans `.env`, seed chargé) :
+
+```bash
+dotnet run --project src/Backend/MonProfAI.Api -- hint-eval
+```
+
+Sur 3 exercices tests (fractions, Pythagore, équation), la commande vérifie que la solution est refusée d'emblée, qu'une réponse fausse est corrigée sans donner la solution, que les indices 1 à 3 ne donnent pas le résultat, que chaque indice est plus précis que le précédent et que la solution est juste. Elle écrit un rapport Markdown. Compter quelques centimes par passage.
+
 **Exercice en photo** : sur la page de saisie, « Prendre une photo » ouvre l'appareil photo sur téléphone, et « Importer une image » ouvre la galerie ou les fichiers. Avant l'envoi, le navigateur réduit l'image à 2000 px de côté au maximum et la convertit en JPEG : une photo de téléphone de plusieurs Mo pèse alors quelques dizaines de Ko, ce qui accélère l'envoi et réduit le coût de l'appel au modèle.
 
 ### Le prompt du tuteur
@@ -346,6 +367,8 @@ erDiagram
 | `Conversations` | Séance d'un élève avec le tuteur, sur une notion ou libre | Supprimée avec l'élève (`CASCADE`), notion protégée (`RESTRICT`) |
 | `Messages` | Message d'une conversation (rôle `0` = élève, `1` = tuteur) | Supprimé avec la conversation (`CASCADE`) |
 | `Exercises` | Énoncé saisi par un élève, rattaché à une notion (statut `0` = à résoudre, `1` = en cours, `2` = résolu) | Supprimé avec l'élève (`CASCADE`), notion protégée (`RESTRICT`), énoncé ≤ 4000 caractères |
+| `ExerciseHints` | Indice débloqué (niveau 1 à 4) | Unicité (`ExerciseId`, `Level`), niveau entre 1 et 4, supprimé avec l'exercice (`CASCADE`) |
+| `ExerciseAttempts` | Réponse proposée par l'élève, avec le verdict et le retour du modèle | Supprimée avec l'exercice (`CASCADE`) |
 
 **Règles de suppression** : le référentiel est protégé. On ne peut pas supprimer une matière qui a des chapitres, un chapitre qui a des notions, une notion encore requise par une autre ou une notion déjà travaillée par un élève (`RESTRICT`). Supprimer une notion supprime seulement ses propres liens de prérequis (`CASCADE`).
 

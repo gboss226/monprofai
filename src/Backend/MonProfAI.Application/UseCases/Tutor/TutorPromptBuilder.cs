@@ -51,7 +51,8 @@ public static class TutorPromptBuilder
         return template;
     }
 
-    private static string DescribeStudent(Domain.Entities.LearnerProfile? profile)
+    /// <summary>The student's profile as prompt lines. Shared with the exercise prompts.</summary>
+    public static string DescribeStudent(Domain.Entities.LearnerProfile? profile)
     {
         if (profile is not { OnboardingCompleted: true })
             return "L'élève n'a pas encore rempli son profil : tu ne connais ni sa classe ni ses préférences. " +
@@ -123,7 +124,7 @@ public static class TutorPromptBuilder
         };
     }
 
-    private static string LevelLabel(SchoolLevel level) => level switch
+    public static string LevelLabel(SchoolLevel level) => level switch
     {
         SchoolLevel.Sixieme => "6ème",
         SchoolLevel.Cinquieme => "5ème",

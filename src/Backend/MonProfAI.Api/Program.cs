@@ -19,9 +19,11 @@ const string SeedCommand = "seed";
 var seedMode = args.Contains(SeedCommand);
 // `dotnet run -- tutor-eval` plays test sessions against the real model and grades the tutor (see README).
 var tutorEvalMode = args.Contains(TutorEval.Command);
+// `dotnet run -- hint-eval` unlocks the exercise hints on test exercises against the real model and grades them.
+var hintEvalMode = args.Contains(HintEval.Command);
 
 var builder = WebApplication.CreateBuilder(
-    args.Where(a => a != SeedCommand && a != TutorEval.Command).ToArray());
+    args.Where(a => a != SeedCommand && a != TutorEval.Command && a != HintEval.Command).ToArray());
 
 // Load environment variables from .env file or system
 builder.Configuration.AddEnvironmentVariables();
@@ -125,16 +127,16 @@ if (seedMode)
     return;
 }
 
-if (tutorEvalMode)
+if (tutorEvalMode || hintEvalMode)
 {
     if (!app.Environment.IsDevelopment())
     {
-        Console.Error.WriteLine("L'évaluation du tuteur ne tourne qu'en Development (elle utilise les comptes du seed).");
+        Console.Error.WriteLine("Les évaluations ne tournent qu'en Development (elles utilisent les comptes du seed).");
         Environment.ExitCode = 1;
         return;
     }
 
-    Environment.ExitCode = await TutorEval.RunAsync(app);
+    Environment.ExitCode = tutorEvalMode ? await TutorEval.RunAsync(app) : await HintEval.RunAsync(app);
     return;
 }
 

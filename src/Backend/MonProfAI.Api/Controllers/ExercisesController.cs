@@ -107,6 +107,73 @@ public class ExercisesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Unlocks the hint of the given level (1 = notion reminder … 4 = full solution). Levels come one at a time,
+    /// in order; the solution needs the three other hints or several wrong answers. 409 otherwise.
+    /// </summary>
+    [HttpPost("{id:guid}/hints")]
+    [EnableRateLimiting(AiSetup.RateLimitPolicy)]
+    public async Task<ActionResult<HintDto>> UnlockHint(
+        Guid id, [FromBody] UnlockHintRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _mediator.Send(new UnlockHintCommand(userId, id, request.Level), cancellationToken));
+        }
+        catch (ExerciseNotFoundException)
+        {
+            return NotFound(new { code = "ExerciseNotFound", message = "Cet exercice est introuvable." });
+        }
+        catch (HintLockedException ex)
+        {
+            return Conflict(new { code = "HintLocked", message = ex.Message });
+        }
+        catch (AiServiceException ex)
+        {
+            return AiError(ex);
+        }
+    }
+
+    /// <summary>Checks an answer proposed by the student: right, or where the mistake is, without the solution.</summary>
+    [HttpPost("{id:guid}/attempts")]
+    [EnableRateLimiting(AiSetup.RateLimitPolicy)]
+    public async Task<ActionResult<AttemptDto>> SubmitAnswer(
+        Guid id, [FromBody] SubmitAnswerRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+            return Unauthorized();
+
+        try
+        {
+            return Ok(await _mediator.Send(new SubmitAnswerCommand(userId, id, request.Answer ?? string.Empty), cancellationToken));
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { code = "InvalidRequest", message = ex.Message });
+        }
+        catch (ExerciseNotFoundException)
+        {
+            return NotFound(new { code = "ExerciseNotFound", message = "Cet exercice est introuvable." });
+        }
+        catch (AiServiceException ex)
+        {
+            return AiError(ex);
+        }
+    }
+
+    private ObjectResult AiError(AiServiceException ex) => StatusCode(
+        ex.Kind switch
+        {
+            AiErrorKind.Timeout => StatusCodes.Status504GatewayTimeout,
+            AiErrorKind.InvalidResponse => StatusCodes.Status502BadGateway,
+            AiErrorKind.Refused => StatusCodes.Status422UnprocessableEntity,
+            _ => StatusCodes.Status503ServiceUnavailable,
+        },
+        new { code = ex.Kind.ToString(), message = ex.StudentMessage });
+
     /// <summary>One of my exercises. 404 if it does not exist or is someone else's.</summary>
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ExerciseDto>> Get(Guid id, CancellationToken cancellationToken)
@@ -123,6 +190,11 @@ public class ExercisesController : ControllerBase
     private bool TryGetUserId(out Guid userId) =>
         Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 }
+
+/// <param name="Level">1 = notion reminder, 2 = method, 3 = first step, 4 = full solution.</param>
+public record UnlockHintRequest(int Level);
+
+public record SubmitAnswerRequest(string? Answer);
 
 /// <param name="Statement">Text read from the photo, formulas in LaTeX. Meant to be checked by the student.</param>
 public record TranscriptionDto(string Statement);

@@ -173,6 +173,67 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.ToTable("Exercises");
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.ExerciseAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ExerciseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Feedback")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsCorrect")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExerciseId", "CreatedAt");
+
+                    b.ToTable("ExerciseAttempts");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.ExerciseHint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ExerciseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExerciseId", "Level")
+                        .IsUnique();
+
+                    b.ToTable("ExerciseHints", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExerciseHints_Level", "\"Level\" BETWEEN 1 AND 4");
+                        });
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.LearnerProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -496,6 +557,28 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MonProfAI.Domain.Entities.ExerciseAttempt", b =>
+                {
+                    b.HasOne("MonProfAI.Domain.Entities.Exercise", "Exercise")
+                        .WithMany("Attempts")
+                        .HasForeignKey("ExerciseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Exercise");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.ExerciseHint", b =>
+                {
+                    b.HasOne("MonProfAI.Domain.Entities.Exercise", "Exercise")
+                        .WithMany("Hints")
+                        .HasForeignKey("ExerciseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Exercise");
+                });
+
             modelBuilder.Entity("MonProfAI.Domain.Entities.LearnerProfile", b =>
                 {
                     b.HasOne("MonProfAI.Domain.Entities.User", "User")
@@ -601,6 +684,13 @@ namespace MonProfAI.Infrastructure.Migrations
                     b.Navigation("Enrollments");
 
                     b.Navigation("Lessons");
+                });
+
+            modelBuilder.Entity("MonProfAI.Domain.Entities.Exercise", b =>
+                {
+                    b.Navigation("Attempts");
+
+                    b.Navigation("Hints");
                 });
 
             modelBuilder.Entity("MonProfAI.Domain.Entities.Notion", b =>
